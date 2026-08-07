@@ -576,8 +576,24 @@ cache-first, which is right for the product but poison for development: every
 edit appears to do nothing until you bump the cache name. Deployed over HTTPS it
 registers normally and the app is fully installable and offline-capable.
 
-When you change a shell file, still bump `CACHE` in [`sw.js`](sw.js) (e.g.
-`wattsleft-v3` → `v4`) so deployed installs pick the change up.
+### Deploying
+
+```bash
+cd tools && node predeploy.mjs
+```
+
+Then commit and push; GitHub Pages rebuilds in about a minute.
+
+`predeploy.mjs` bumps `CACHE` in [`sw.js`](sw.js) and refuses to continue if
+any module under `js/` is missing from `SHELL`. Both matter, and both fail
+*silently*, which is why this is a script and not a note to self:
+
+- The worker is **cache-first**, so a phone that already installed the app
+  keeps serving the old version until `CACHE` changes. This bit immediately
+  after the first deploy — the server had 201 cars, the phone still showed 148.
+- `cache.addAll` is **atomic**: one wrong path means nothing is cached at all.
+  And these are ES modules loaded by static import, so offline a missing file
+  does not degrade — it stops the app booting.
 
 ---
 
