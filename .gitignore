@@ -1,0 +1,10 @@
+# The screenshot harness is a development tool, not part of the app. Its
+# node_modules is ~19 MB against an app that is under half a megabyte, and
+# nothing it produces belongs on a phone.
+tools/node_modules/
+tools/shots/
+tools/.playwright-mcp/
+
+# Playwright's scratch output, wherever it lands.
+.playwright-mcp/
+*.log

@@ -1,0 +1,13 @@
+{
+  "name": "wattsleft-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Screenshot / visual-check harness for Watt's Left. Not part of the app itself - the app is plain static files with no build step.",
+  "type": "module",
+  "scripts": {
+    "shots": "node shoot.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

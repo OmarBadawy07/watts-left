@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#0b1220"/>
+  <!-- Battery body -->
+  <rect x="96" y="176" width="272" height="160" rx="28" fill="none" stroke="#38e08a" stroke-width="22"/>
+  <!-- Battery terminal -->
+  <rect x="386" y="222" width="34" height="68" rx="14" fill="#38e08a"/>
+  <!-- Charge bolt -->
+  <path d="M246 196 L166 274 h56 l-24 62 84 -84 h-58 z" fill="#38e08a"/>
+</svg>
