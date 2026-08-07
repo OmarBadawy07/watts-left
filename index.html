@@ -193,29 +193,6 @@
       <input type="range" id="speed" min="20" max="160" step="1" value="110" />
     </label>
 
-    <label class="field">
-      <span>Outside temperature <output id="tempOut">20 °C</output> <em class="auto-badge hidden" id="tempAuto">auto</em></span>
-      <input type="range" id="temp" min="-25" max="45" step="1" value="20" />
-      <small class="hint">The single biggest factor after speed. Cold costs you twice: the pack holds less, and the cabin needs heating.</small>
-    </label>
-
-    <label class="field">
-      <span>Headwind <output id="windOut">0 km/h</output> <em class="auto-badge hidden" id="windAuto">auto</em></span>
-      <input type="range" id="wind" min="-40" max="60" step="1" value="0" />
-      <small class="hint">Negative is a tailwind. A 30 km/h headwind at 100 km/h makes the car work as hard as it would at 130.</small>
-    </label>
-
-    <div class="grid-2">
-      <label class="field">
-        <span>Passengers <em>(incl. you)</em></span>
-        <input type="number" id="passengers" min="1" max="8" step="1" value="1" />
-      </label>
-      <label class="field">
-        <span>Cargo <em>kg</em></span>
-        <input type="number" id="cargoKg" min="0" max="800" step="5" value="0" />
-      </label>
-    </div>
-
     <div class="field">
       <span class="field-label">Climate / AC level</span>
       <div class="segmented" id="climateSetup" role="group" aria-label="Climate level">
@@ -226,6 +203,41 @@
       </div>
       <small class="hint" id="climateHint"></small>
     </div>
+
+    <!-- Everything below is either filled in automatically when you plan a
+         route (temperature, wind) or fine at its default (passengers, cargo).
+         Folding it away leaves speed and climate — the two things people
+         actually change — as the whole of this card. The summary line keeps
+         the current values visible so nothing is hidden, only tidied. -->
+    <details class="disclosure">
+      <summary>
+        <span>Weather &amp; load</span>
+        <em id="fineTuneSummary"></em>
+      </summary>
+
+      <label class="field">
+        <span>Outside temperature <output id="tempOut">20 °C</output> <em class="auto-badge hidden" id="tempAuto">auto</em></span>
+        <input type="range" id="temp" min="-25" max="45" step="1" value="20" />
+        <small class="hint">The single biggest factor after speed. Cold costs you twice: the pack holds less, and the cabin needs heating.</small>
+      </label>
+
+      <label class="field">
+        <span>Headwind <output id="windOut">0 km/h</output> <em class="auto-badge hidden" id="windAuto">auto</em></span>
+        <input type="range" id="wind" min="-40" max="60" step="1" value="0" />
+        <small class="hint">Negative is a tailwind. A 30 km/h headwind at 100 km/h makes the car work as hard as it would at 130.</small>
+      </label>
+
+      <div class="grid-2">
+        <label class="field">
+          <span>Passengers <em>(incl. you)</em></span>
+          <input type="number" id="passengers" min="1" max="8" step="1" value="1" />
+        </label>
+        <label class="field">
+          <span>Cargo <em>kg</em></span>
+          <input type="number" id="cargoKg" min="0" max="800" step="5" value="0" />
+        </label>
+      </div>
+    </details>
   </section>
 
   <!-- ---------------- Prediction ---------------- -->
@@ -489,21 +501,8 @@
 
       <div id="lAdvice" class="advice"></div>
 
-      <section class="card compact">
-        <span class="field-label">Speed source</span>
-        <div class="segmented two" id="speedSource" role="group" aria-label="Speed source">
-          <button type="button" data-src="gps" class="on">GPS</button>
-          <button type="button" data-src="manual">Manual</button>
-        </div>
-        <div id="manualSpeedWrap" class="hidden">
-          <label class="field" style="margin: 14px 0 0">
-            <span>Driving at <output id="manualSpeedOut">100 km/h</output></span>
-            <input type="range" id="manualSpeed" min="0" max="160" step="1" value="100" />
-          </label>
-        </div>
-        <small class="hint" id="speedSourceHint"></small>
-      </section>
-
+      <!-- The ONE control a driver changes mid-journey, so it is the only one
+           left in the open. Everything below folds away. -->
       <section class="card compact">
         <span class="field-label">Climate / AC</span>
         <div class="segmented" id="climateLive" role="group" aria-label="Climate level">
@@ -515,8 +514,43 @@
         <small class="hint" id="climateLiveHint"></small>
       </section>
 
-      <section class="card compact">
-        <h3>Calibrate</h3>
+      <!-- Opened automatically when GPS falls back, because that is the moment
+           it stops being an advanced setting and becomes the thing you need. -->
+      <details class="disclosure" id="speedDisclosure">
+        <summary>
+          <span>Speed source</span>
+          <em id="speedSourceSummary">GPS</em>
+        </summary>
+        <div class="segmented two" id="speedSource" role="group" aria-label="Speed source">
+          <button type="button" data-src="gps" class="on">GPS</button>
+          <button type="button" data-src="manual">Manual</button>
+        </div>
+        <div id="manualSpeedWrap" class="hidden">
+          <label class="field" style="margin: 14px 0 0">
+            <span>Driving at <output id="manualSpeedOut">100 km/h</output></span>
+            <input type="range" id="manualSpeed" min="0" max="160" step="1" value="100" />
+          </label>
+        </div>
+        <small class="hint" id="speedSourceHint"></small>
+      </details>
+
+      <details class="disclosure">
+        <summary>
+          <span>Trip so far</span>
+          <em id="tripLogSummary">0.0 km</em>
+        </summary>
+        <div class="trip-log">
+          <div><span>Driven</span><b id="lDriven">0.0 km</b></div>
+          <div><span>Elapsed</span><b id="lElapsed">0m</b></div>
+          <div><span>Avg speed</span><b id="lAvgSpeed">—</b></div>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>
+          <span>Teach it your car</span>
+          <em id="calibrationSummary">not yet</em>
+        </summary>
         <p class="hint">
           Tell the app what your car's own battery percentage says right now. It
           compares that against its own prediction and learns how far off it is.
@@ -526,17 +560,16 @@
           <button id="applyCalibration" class="secondary">Apply</button>
         </div>
         <small class="hint" id="calibrationState">No correction applied yet.</small>
-      </section>
+      </details>
 
-      <section class="card compact trip-log">
-        <div><span>Driven</span><b id="lDriven">0.0 km</b></div>
-        <div><span>Elapsed</span><b id="lElapsed">0m</b></div>
-        <div><span>Avg speed</span><b id="lAvgSpeed">—</b></div>
-      </section>
-
-      <!-- Turns "tracking doesn't work" into a specific, answerable question. -->
-      <section class="card compact">
-        <h3>Location diagnostics</h3>
+      <!-- Turns "tracking doesn't work" into a specific, answerable question —
+           but a driver should never have to look at it, so it stays shut until
+           something is actually wrong. -->
+      <details class="disclosure" id="diagDisclosure">
+        <summary>
+          <span>Troubleshooting</span>
+          <em id="diagSummary">—</em>
+        </summary>
         <dl class="diag">
           <dt>Secure context</dt><dd class="diag-value" id="diagSecure">—</dd>
           <dt>Permission</dt><dd class="diag-value" id="diagPermission">—</dd>
@@ -562,7 +595,7 @@
           voice guidance and the battery countdown work. Clearly marked on screen
           so it can never be mistaken for a real position.
         </small>
-      </section>
+      </details>
 
       <footer class="disclaimer">
         Estimate only. No live traffic data — times are free-flow estimates.

@@ -454,6 +454,12 @@ export function setDriving(on, reason = '') {
   if (on && trip.speedSource === 'manual' && !trip.simulating) {
     trip.speedKmh = trip.manualSpeedKmh;
   }
+
+  // Starting or stopping is a discontinuity, not a wobble. Clearing this makes
+  // the next tick re-seed the average from the new draw instead of crawling
+  // across the gap — which is what shed six hours a second on "Start driving".
+  trip.smoothedDrawW = 0;
+
   if (trip.active) tick();
 }
 
@@ -537,9 +543,35 @@ export function tick() {
   const totalKm = nav.active && state.route ? state.route.distanceKm : base.tripKm;
   const frac = totalKm > 0 ? remainingKm / totalKm : 0;
 
+  // ==========================================================================
+  // WHICH SPEED THE PROJECTION USES WHILE PAUSED
+  // ==========================================================================
+  // Nothing is being measured while paused, so projecting at the MEASURED
+  // speed means projecting at zero — which produced a headline of "67 h" that
+  // then had to collapse to "2 h 46 m" the moment driving began. Two different
+  // questions were sharing one giant number.
+  //
+  // Paused, the useful question is "what will this trip cost at the speed I
+  // intend to hold?", so the projection uses the planned speed. Pressing Start
+  // driving then changes the LABEL, not the figure, and there is nothing to
+  // fall from. The genuinely useful parked-with-the-AC-on number has not been
+  // lost — it moves to the advice line below, where it reads as a fact rather
+  // than a countdown.
+  // There is a third state besides paused and driving: DRIVING BUT NOT YET
+  // MEASURING. Pressing Start driving before the first GPS fix arrives used to
+  // show a confident 0 km/h for the eight seconds until the watchdog gave up.
+  // Zero is not what the car is doing; it is what we do not know yet. So the
+  // planned speed stands in, and the label says so rather than pretending.
+  const plannedKmh = trip.manualSpeedKmh > 0 ? trip.manualSpeedKmh : numVal('speed', 100);
+  const speedKnown = trip.simulating
+    || trip.speedSource === 'manual'
+    || trip.usableFixCount > 0;
+  const assuming = !trip.paused && !speedKnown;
+  const vShown = (trip.paused || assuming) ? plannedKmh : v;
+
   const live = {
     ...base,
-    speedKmh: v,
+    speedKmh: vShown,
     tripKm: remainingKm,
     elevationM: base.elevationM * frac,
     climbM: base.climbM == null ? null : base.climbM * frac,
@@ -555,30 +587,45 @@ export function tick() {
   // with the AC on, you have 9 hours".
   const idleW = climatePowerW(base.climateLevel, base.tempC, base.car.heatPump)
               + C.BASELINE_AUX_W;
-  const drawW = v === 0 ? idleW : p.powerKw * 1000;
+  const drawW = vShown === 0 ? idleW : p.powerKw * 1000;
+  // effDtH is 0 while paused, so a projected speed can never invent energy.
   trip.usedWh += drawW * effDtH;
 
-  // --- Smooth the draw used for the HEADLINE prediction ---------------------
-  // "Battery empty in" was computed from the instantaneous draw, and that made
-  // it unreadable. Standing still the car draws ~0.5 kW, so it reads 80 hours;
-  // the instant the speed reads 20 km/h it draws 1.7 kW and reads 27 hours.
-  // Both are arithmetically right, but the headline leapt by fifty hours and
-  // the predicted empty-time clock appeared to run backwards.
+  // --- The draw behind the HEADLINE prediction ------------------------------
   //
-  // On a device without a GPS chip, speed flickers between zero and a noise
-  // spike, so this happened continuously.
+  // ==========================================================================
+  // WHY THIS IS NOT SIMPLY SMOOTHED, AND THE BUG THAT TAUGHT US
+  // ==========================================================================
+  // The headline is `remaining energy / draw`. Smoothing the draw sounds safe
+  // and is not, because the draw is a DENOMINATOR: a slowly-rising denominator
+  // makes the headline fall hyperbolically, fastest at the start.
   //
-  // A ~30 second time constant keeps the headline steady enough to read at a
-  // glance while still responding to a real change like switching the AC on.
-  // The kW tile keeps showing the true instantaneous value — that one is meant
-  // to be live.
-  // While paused there is nothing to smooth: the speed is a stated intention,
-  // not a noisy measurement, so the projection should be right immediately.
-  trip.smoothedDrawW = (trip.paused || !trip.smoothedDrawW)
+  // Measured on a real transition. Pressing "Start driving" at 110 km/h took
+  // the draw from 0.7 kW to 17.2 kW instantly, but a 30-second average crawled
+  // between the two — and the headline shed SIX HOURS PER SECOND while the kW
+  // tile sat perfectly still at 17.2:
+  //
+  //     67h 45m -> 27h 46m -> 21h 39m -> 17h 51m -> 15h 15m ...
+  //
+  // The smoothing was added to stop the headline jumping. It turned one honest
+  // instant jump into a half-minute freefall that looked far more broken.
+  //
+  // The rule that actually holds: smooth a MEASUREMENT, never a STATEMENT.
+  //   - Manual and simulated speeds are stated intentions. Exact. No smoothing.
+  //   - GPS speed is a measurement, and is ALREADY smoothed above (alpha 0.3).
+  //     The draw derived from it is therefore smooth too, so a second stage
+  //     buys nothing and costs correctness.
+  //
+  // What remains is a light average that exists only to damp residual GPS
+  // jitter at cruise — and it is re-seeded on every change of driving state,
+  // so it can never crawl across a transition again. The kW tile keeps the
+  // true instantaneous value; that one is meant to be live.
+  const speedIsStated = trip.simulating || trip.speedSource === 'manual';
+  trip.smoothedDrawW = (trip.paused || speedIsStated || !trip.smoothedDrawW)
     ? drawW
-    : trip.smoothedDrawW + 0.03 * (drawW - trip.smoothedDrawW);
+    : trip.smoothedDrawW + 0.25 * (drawW - trip.smoothedDrawW);
 
-  renderLive(live, p, v, drawW, idleW, remainingKm);
+  renderLive(live, p, vShown, drawW, idleW, remainingKm, assuming);
 }
 
 /** SoC right now = what we started with, minus what the model says we used. */
@@ -591,7 +638,7 @@ function currentSoc(cond) {
 // 6. Live screen rendering
 // ---------------------------------------------------------------------------
 
-function renderLive(cond, p, v, drawW, idleW, remainingKm) {
+function renderLive(cond, p, v, drawW, idleW, remainingKm, assuming = false) {
   const soc = cond.socPercent;
   const { fullWh } = availableEnergyWh(cond.car, 100, cond.sohPercent, cond.tempC);
   const remainingWh = fullWh * (soc / 100);
@@ -637,23 +684,32 @@ function renderLive(cond, p, v, drawW, idleW, remainingKm) {
   hero.classList.toggle('bad', !trip.paused && hoursToEmpty < 0.5);
   hero.classList.toggle('warn', !trip.paused && hoursToEmpty >= 0.5 && hoursToEmpty < 1);
 
-  $('heroLabel').textContent = !trip.paused
-    ? 'Battery empty in'
-    : v < 2
-      // Standing still, the only load is climate and electronics — so this is
-      // the genuinely useful "parked with the AC running" figure.
-      ? 'Parked like this, the battery would last'
-      : `At ${Math.round(v)} km/h the battery would last`;
+  // Paused, the figure is a projection at the speed you intend to hold — the
+  // same number you will see the moment you set off, so nothing jumps. Driving
+  // and genuinely stopped (a red light, a queue), it is the parked figure.
+  $('heroLabel').textContent = trip.paused
+    ? `At ${Math.round(v)} km/h the battery would last`
+    : assuming
+      ? `Assuming ${Math.round(v)} km/h — battery empty in`
+      : v < 2
+        ? 'Stopped — the battery would last'
+        : 'Battery empty in';
   $('heroClock').style.visibility = trip.paused ? 'hidden' : 'visible';
-  $('speedTileLabel').textContent = trip.paused ? 'km/h planned' : 'km/h now';
+  $('speedTileLabel').textContent = (trip.paused || assuming) ? 'km/h assumed' : 'km/h now';
 
   const vEl = $('lVerdict');
   if (trip.paused) {
     setVerdict(vEl, 'tight',
       'Paused — nothing is being counted. Press <strong>Start driving</strong> when you set off.');
-    $('lAdvice').innerHTML = advicePara('These figures are a projection of what this trip would '
-      + 'cost at the settings above. Change the speed or the climate level to see the effect '
-      + 'before you leave.');
+    // The parked-with-the-climate-on figure is genuinely useful — waiting in
+    // the car is a real thing people do — but it belongs here as a fact, not
+    // in the headline where it reads as a countdown and has to collapse by
+    // sixty hours the moment you set off.
+    const parkedHours = idleW > 0 ? (fullWh * (soc / 100)) / idleW : Infinity;
+    $('lAdvice').innerHTML = advicePara(
+      `A projection at ${Math.round(v)} km/h — change the speed or climate above to see the `
+      + `effect before you leave. Sitting still with the climate on, this charge would last `
+      + `<strong>${formatDuration(parkedHours)}</strong>.`);
     $('climateLiveHint').textContent = climateDescription({ ...cond, speedKmh: Math.max(3, v) });
     paintTripLog();
     if ($('navSheet').classList.contains('expanded')) paintDiagnostics();
@@ -709,6 +765,14 @@ function paintTripLog() {
   $('lElapsed').textContent = formatDuration(trip.elapsedH);
   $('lAvgSpeed').textContent = trip.elapsedH > 0.003
     ? `${(trip.drivenKm / trip.elapsedH).toFixed(0)} km/h` : '—';
+
+  // Closed-row summaries, so folding these away costs no information.
+  $('tripLogSummary').textContent = `${trip.drivenKm.toFixed(1)} km`;
+  $('speedSourceSummary').textContent = trip.simulating
+    ? 'simulated'
+    : trip.speedSource === 'manual'
+      ? `manual · ${Math.round(trip.manualSpeedKmh)} km/h`
+      : 'GPS';
 }
 
 // ---------------------------------------------------------------------------
@@ -739,6 +803,11 @@ export function applyCalibration() {
 
   const before = trip.calibration;
   trip.calibration = updateCalibration(trip.usedWh, actualUsedWh, before);
+
+  const pctOf = (c) => Math.round((c - 1) * 100);
+  $('calibrationSummary').textContent = trip.calibration === 1
+    ? 'not yet'
+    : `${pctOf(trip.calibration) > 0 ? '+' : ''}${pctOf(trip.calibration)}%`;
 
   if (trip.calibration === before) {
     $('calibrationState').textContent =

@@ -80,6 +80,20 @@ function syncOutputs() {
   $('windOut').textContent = `${$('wind').value} km/h`;
   $('reserveOut').textContent = `${$('reserve').value}%`;
   $('carCount').textContent = `${CARS.length} models`;
+
+  // The folded "Weather & load" card still reports itself on its closed row,
+  // so collapsing it tidies the form without concealing a setting. Only the
+  // non-default parts are named — a summary that always reads "1 passenger,
+  // 0 kg" is noise.
+  const parts = [`${$('temp').value} °C`];
+  const wind = +$('wind').value;
+  if (wind > 0) parts.push(`${wind} km/h headwind`);
+  else if (wind < 0) parts.push(`${-wind} km/h tailwind`);
+  const people = +$('passengers').value;
+  if (people > 1) parts.push(`${people} people`);
+  const cargo = +$('cargoKg').value;
+  if (cargo > 0) parts.push(`${cargo} kg`);
+  $('fineTuneSummary').textContent = parts.join(' · ');
 }
 
 /** Recompute and repaint the setup screen. Cheap enough to run on every input. */

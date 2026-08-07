@@ -1080,6 +1080,58 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
   padding: 2px 6px; border-radius: 5px; font-style: normal;
 }
 
+/* ---- Folding away the advanced controls ----------------------------------
+   Both screens had every control on display at once, which made the setup
+   form long and the driving sheet a wall of panels. These fold the things
+   that are either auto-filled or rarely touched, while the summary on the
+   right keeps their current value visible — tidied, not hidden. */
+.disclosure {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0 14px;
+  margin-top: 12px;
+}
+.disclosure > summary {
+  display: flex; align-items: center; gap: 10px;
+  /* 48px keeps this a comfortable target in a moving car. */
+  min-height: 48px;
+  font-size: 14.5px; font-weight: 650;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  -webkit-user-select: none; user-select: none;
+}
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::after {
+  content: '';
+  width: 8px; height: 8px;
+  margin-left: auto;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .2s ease;
+}
+.disclosure[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+.disclosure > summary > em {
+  margin-left: auto;
+  font-style: normal; font-size: 13px; font-weight: 500;
+  color: var(--text-dim);
+  text-align: right;
+  /* Never let a long summary push the chevron off the edge. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.disclosure > summary > em:empty { display: none; }
+.disclosure > summary > em + ::after { margin-left: 10px; }
+.disclosure > *:not(summary) { margin-bottom: 14px; }
+.disclosure > summary:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
+
+/* A disclosure that has something wrong inside it says so on the closed row. */
+.disclosure.attention { border-color: rgba(255,90,99,.45); }
+.disclosure.attention > summary > em { color: var(--danger); }
+
+.disclosure .trip-log { display: flex; justify-content: space-between; gap: 8px; }
+
 /* ---- Sheet on a wide screen ---------------------------------------------
    A bottom sheet is a phone idea. Stretched across a 1280px desktop it made
    the "Start driving" button nearly two metres of green with its label

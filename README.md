@@ -444,7 +444,7 @@ styles.css            dark, high-contrast, 40px+ touch targets for in-car use
 
 js/geometry.js        great-circle maths — one haversine, one signature
 js/physics.js         the energy model — heavily commented, no UI or network
-js/cars.js            148 EVs: battery, mass, Cd, frontal area, heat pump
+js/cars.js            201 EVs across 76 brands, including vans and pickups
 js/geo.js             place search, geocoding, elevation profile, weather
 js/navigation.js      routing, turn-by-turn, snap-to-route, voice, basemaps
 

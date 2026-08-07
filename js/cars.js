@@ -225,6 +225,83 @@ export const CARS = [
   { id: 'zeekr-x',        name: 'Zeekr X',                       usableKwh: 66.0, massKg: 1900, cd: 0.280, areaM2: 2.45, crr: 0.0100, eta: 0.89, heatPump: true },
   { id: 'leapmotor-c10',  name: 'Leapmotor C10',                 usableKwh: 69.9, massKg: 1980, cd: 0.280, areaM2: 2.60, crr: 0.0100, eta: 0.88, heatPump: true },
   { id: 'vinfast-vf8',    name: 'VinFast VF 8 Eco',              usableKwh: 82.0, massKg: 2350, cd: 0.290, areaM2: 2.70, crr: 0.0110, eta: 0.87, heatPump: false },
+
+  // ==========================================================================
+  // Everything below follows the same rules as above: USABLE battery (not
+  // gross), kerb mass, published Cd where the manufacturer gives one, and
+  // frontal area as 0.83 x width x height wherever it is not published.
+  // ==========================================================================
+
+  // ---- Xiaomi ----
+  { id: 'xiaomi-su7',     name: 'Xiaomi SU7 RWD',                usableKwh: 69.0, massKg: 1980, cd: 0.195, areaM2: 2.37, crr: 0.0090, eta: 0.91, heatPump: true },
+  { id: 'xiaomi-su7-max', name: 'Xiaomi SU7 Max AWD',            usableKwh: 97.0, massKg: 2205, cd: 0.195, areaM2: 2.37, crr: 0.0095, eta: 0.91, heatPump: true },
+  { id: 'xiaomi-yu7',     name: 'Xiaomi YU7',                    usableKwh: 96.0, massKg: 2405, cd: 0.245, areaM2: 2.65, crr: 0.0100, eta: 0.91, heatPump: true },
+
+  // ---- Lotus / Maserati / Rolls-Royce / Bentley ----
+  { id: 'lotus-eletre',   name: 'Lotus Eletre',                  usableKwh: 109.0, massKg: 2490, cd: 0.260, areaM2: 2.80, crr: 0.0105, eta: 0.90, heatPump: true },
+  { id: 'lotus-emeya',    name: 'Lotus Emeya',                   usableKwh: 102.0, massKg: 2565, cd: 0.210, areaM2: 2.45, crr: 0.0100, eta: 0.90, heatPump: true },
+  { id: 'maserati-gt',    name: 'Maserati GranTurismo Folgore',  usableKwh: 83.0, massKg: 2260, cd: 0.260, areaM2: 2.30, crr: 0.0095, eta: 0.90, heatPump: true },
+  { id: 'maserati-grecale', name: 'Maserati Grecale Folgore',    usableKwh: 96.0, massKg: 2540, cd: 0.300, areaM2: 2.70, crr: 0.0105, eta: 0.89, heatPump: true },
+  { id: 'rr-spectre',     name: 'Rolls-Royce Spectre',           usableKwh: 102.0, massKg: 2975, cd: 0.250, areaM2: 2.90, crr: 0.0110, eta: 0.89, heatPump: true },
+
+  // ---- Alpine / Alfa Romeo / Lancia / Land Rover ----
+  { id: 'alpine-a290',    name: 'Alpine A290',                   usableKwh: 52.0, massKg: 1479, cd: 0.320, areaM2: 2.25, crr: 0.0095, eta: 0.88, heatPump: true },
+  { id: 'alpine-a390',    name: 'Alpine A390',                   usableKwh: 89.0, massKg: 2120, cd: 0.290, areaM2: 2.50, crr: 0.0100, eta: 0.89, heatPump: true },
+  { id: 'alfa-junior',    name: 'Alfa Romeo Junior Elettrica',   usableKwh: 51.0, massKg: 1545, cd: 0.320, areaM2: 2.35, crr: 0.0095, eta: 0.88, heatPump: true },
+  { id: 'lancia-ypsilon', name: 'Lancia Ypsilon Elettrica',      usableKwh: 51.0, massKg: 1535, cd: 0.310, areaM2: 2.30, crr: 0.0095, eta: 0.88, heatPump: true },
+  { id: 'range-rover-ev', name: 'Range Rover Electric',          usableKwh: 118.0, massKg: 3100, cd: 0.290, areaM2: 3.20, crr: 0.0115, eta: 0.89, heatPump: true },
+
+  // ---- Acura / Ram / Scout / more Cadillac and Chevrolet ----
+  { id: 'acura-zdx',      name: 'Acura ZDX',                     usableKwh: 102.0, massKg: 2740, cd: 0.290, areaM2: 2.85, crr: 0.0110, eta: 0.89, heatPump: true },
+  { id: 'ram-1500-rev',   name: 'Ram 1500 REV',                  usableKwh: 168.0, massKg: 3470, cd: 0.340, areaM2: 3.55, crr: 0.0120, eta: 0.89, heatPump: true },
+  { id: 'cadillac-optiq', name: 'Cadillac Optiq',                usableKwh: 85.0, massKg: 2340, cd: 0.290, areaM2: 2.70, crr: 0.0105, eta: 0.89, heatPump: true },
+  { id: 'cadillac-vistiq', name: 'Cadillac Vistiq',              usableKwh: 102.0, massKg: 2900, cd: 0.300, areaM2: 3.00, crr: 0.0115, eta: 0.89, heatPump: true },
+  { id: 'escalade-iq',    name: 'Cadillac Escalade IQ',          usableKwh: 205.0, massKg: 4130, cd: 0.320, areaM2: 3.60, crr: 0.0125, eta: 0.89, heatPump: true },
+
+  // ---- More Chinese brands ----
+  { id: 'li-mega',        name: 'Li Auto MEGA',                  usableKwh: 102.7, massKg: 2755, cd: 0.215, areaM2: 3.05, crr: 0.0105, eta: 0.90, heatPump: true },
+  { id: 'denza-d9',       name: 'Denza D9 EV',                   usableKwh: 103.0, massKg: 2810, cd: 0.280, areaM2: 3.10, crr: 0.0110, eta: 0.89, heatPump: true },
+  { id: 'avatr-11',       name: 'Avatr 11',                      usableKwh: 90.4, massKg: 2450, cd: 0.280, areaM2: 2.70, crr: 0.0105, eta: 0.89, heatPump: true },
+  { id: 'voyah-free',     name: 'Voyah Free EV',                 usableKwh: 106.0, massKg: 2540, cd: 0.280, areaM2: 2.80, crr: 0.0105, eta: 0.89, heatPump: true },
+  { id: 'hongqi-eh7',     name: 'Hongqi EH7',                    usableKwh: 89.0, massKg: 2180, cd: 0.220, areaM2: 2.45, crr: 0.0095, eta: 0.90, heatPump: true },
+  { id: 'geely-galaxy-e5', name: 'Geely Galaxy E5',              usableKwh: 60.2, massKg: 1740, cd: 0.270, areaM2: 2.50, crr: 0.0095, eta: 0.89, heatPump: true },
+  { id: 'lynkco-02',      name: 'Lynk & Co 02',                  usableKwh: 66.0, massKg: 1885, cd: 0.260, areaM2: 2.45, crr: 0.0095, eta: 0.89, heatPump: true },
+  { id: 'wuling-mini',    name: 'Wuling Hongguang Mini EV',      usableKwh: 17.3, massKg: 743,  cd: 0.380, areaM2: 2.05, crr: 0.0110, eta: 0.85, heatPump: false },
+  { id: 'wuling-bingo',   name: 'Wuling Bingo',                  usableKwh: 37.9, massKg: 1180, cd: 0.320, areaM2: 2.25, crr: 0.0100, eta: 0.86, heatPump: false },
+  { id: 'aiways-u5',      name: 'Aiways U5',                     usableKwh: 63.0, massKg: 1720, cd: 0.290, areaM2: 2.55, crr: 0.0100, eta: 0.87, heatPump: false },
+  { id: 'aito-m9',        name: 'AITO M9 EV',                    usableKwh: 97.0, massKg: 2740, cd: 0.269, areaM2: 3.00, crr: 0.0110, eta: 0.89, heatPump: true },
+  { id: 'im-l6',          name: 'IM Motors L6',                  usableKwh: 100.0, massKg: 2245, cd: 0.229, areaM2: 2.45, crr: 0.0095, eta: 0.90, heatPump: true },
+  { id: 'deepal-s07',     name: 'Deepal S07',                    usableKwh: 79.9, massKg: 2135, cd: 0.280, areaM2: 2.62, crr: 0.0100, eta: 0.89, heatPump: true },
+  { id: 'omoda-e5',       name: 'Omoda E5',                      usableKwh: 61.0, massKg: 1710, cd: 0.290, areaM2: 2.52, crr: 0.0100, eta: 0.88, heatPump: true },
+  { id: 'byd-seagull',    name: 'BYD Dolphin Surf / Seagull',    usableKwh: 43.2, massKg: 1310, cd: 0.310, areaM2: 2.25, crr: 0.0095, eta: 0.87, heatPump: false },
+  { id: 'zeekr-7x',       name: 'Zeekr 7X',                      usableKwh: 100.0, massKg: 2385, cd: 0.267, areaM2: 2.70, crr: 0.0100, eta: 0.90, heatPump: true },
+  { id: 'nio-es8',        name: 'NIO ES8 (100 kWh)',             usableKwh: 100.0, massKg: 2680, cd: 0.260, areaM2: 3.00, crr: 0.0110, eta: 0.89, heatPump: true },
+  { id: 'xpeng-g9',       name: 'XPeng G9 Long Range',           usableKwh: 98.0, massKg: 2340, cd: 0.272, areaM2: 2.70, crr: 0.0105, eta: 0.90, heatPump: true },
+
+  // ---- India ----
+  { id: 'tata-nexon-ev',  name: 'Tata Nexon EV Long Range',      usableKwh: 40.5, massKg: 1520, cd: 0.320, areaM2: 2.40, crr: 0.0105, eta: 0.87, heatPump: false },
+  { id: 'tata-curvv-ev',  name: 'Tata Curvv EV',                 usableKwh: 55.0, massKg: 1670, cd: 0.290, areaM2: 2.45, crr: 0.0100, eta: 0.88, heatPump: false },
+  { id: 'mahindra-be6',   name: 'Mahindra BE 6',                 usableKwh: 79.0, massKg: 2000, cd: 0.280, areaM2: 2.55, crr: 0.0100, eta: 0.89, heatPump: true },
+  { id: 'kgm-torres-evx', name: 'KGM Torres EVX',                usableKwh: 73.4, massKg: 1930, cd: 0.320, areaM2: 2.70, crr: 0.0105, eta: 0.87, heatPump: false },
+
+  // ---- Vans and light commercial ----
+  //
+  // These matter more than their sales numbers suggest: a van is a brick with
+  // a big frontal area, so the speed term dominates far earlier than it does
+  // in a car. A model that only knows about saloons is no use to a courier.
+  { id: 'e-transit',      name: 'Ford E-Transit (68 kWh)',       usableKwh: 68.0, massKg: 2450, cd: 0.360, areaM2: 4.00, crr: 0.0120, eta: 0.87, heatPump: false },
+  { id: 'e-transit-cus',  name: 'Ford E-Transit Custom',         usableKwh: 64.0, massKg: 2150, cd: 0.330, areaM2: 3.40, crr: 0.0115, eta: 0.88, heatPump: true },
+  { id: 'esprinter-113',  name: 'Mercedes eSprinter (113 kWh)',  usableKwh: 113.0, massKg: 2900, cd: 0.360, areaM2: 4.30, crr: 0.0125, eta: 0.88, heatPump: true },
+  { id: 'evito',          name: 'Mercedes eVito Tourer',         usableKwh: 60.0, massKg: 2400, cd: 0.330, areaM2: 3.50, crr: 0.0120, eta: 0.87, heatPump: false },
+  { id: 'vw-etransp',     name: 'VW e-Transporter',              usableKwh: 64.0, massKg: 2200, cd: 0.330, areaM2: 3.40, crr: 0.0115, eta: 0.88, heatPump: true },
+  { id: 'master-etech',   name: 'Renault Master E-Tech',         usableKwh: 87.0, massKg: 2600, cd: 0.320, areaM2: 4.10, crr: 0.0120, eta: 0.88, heatPump: true },
+  { id: 'kangoo-etech',   name: 'Renault Kangoo E-Tech',         usableKwh: 45.0, massKg: 1730, cd: 0.330, areaM2: 3.00, crr: 0.0110, eta: 0.87, heatPump: false },
+  { id: 'peugeot-eboxer', name: 'Peugeot e-Boxer',               usableKwh: 110.0, massKg: 2800, cd: 0.350, areaM2: 4.20, crr: 0.0125, eta: 0.87, heatPump: false },
+  { id: 'citroen-eberl',  name: 'Citroen e-Berlingo',            usableKwh: 50.0, massKg: 1770, cd: 0.330, areaM2: 3.00, crr: 0.0110, eta: 0.87, heatPump: true },
+  { id: 'maxus-edeliver9', name: 'Maxus eDeliver 9 (88 kWh)',    usableKwh: 88.5, massKg: 2900, cd: 0.360, areaM2: 4.20, crr: 0.0125, eta: 0.87, heatPump: false },
+  { id: 'iveco-edaily',   name: 'Iveco eDaily',                  usableKwh: 74.0, massKg: 3100, cd: 0.370, areaM2: 4.40, crr: 0.0130, eta: 0.87, heatPump: false },
+  { id: 'nissan-townstar', name: 'Nissan Townstar EV',           usableKwh: 45.0, massKg: 1750, cd: 0.330, areaM2: 3.00, crr: 0.0110, eta: 0.87, heatPump: false },
+  { id: 'rivian-edv700',  name: 'Rivian EDV 700',                usableKwh: 135.0, massKg: 3400, cd: 0.350, areaM2: 4.50, crr: 0.0125, eta: 0.89, heatPump: true },
 ];
 
 /**

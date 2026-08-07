@@ -261,9 +261,13 @@ export function fallBackToManual(reason) {
   $('speedSourceHint').textContent =
     `${reason} Set your speed below — everything else (climate, terrain, wind, `
     + 'calibration) still updates live.';
-  // Open the sheet once, so the manual speed control is in front of the user
-  // rather than hidden behind a handle they have not tapped.
+  // Open the sheet AND the speed panel once, so the manual speed control is in
+  // front of the user rather than behind a handle and a fold they have not
+  // touched. This is the moment "Speed source" stops being an advanced setting
+  // and becomes the only thing that matters.
   $('navSheet').classList.add('expanded');
+  const speedPanel = $('speedDisclosure');
+  if (speedPanel) speedPanel.open = true;
 }
 
 export function setGpsState(text, cls) {
@@ -363,6 +367,28 @@ export async function paintDiagnostics() {
     !trip.lastFixAt ? 'bad' : Date.now() - trip.lastFixAt < STALE_FIX_MS ? 'ok' : 'warn');
   set('diagSource', trip.simulating ? 'SIMULATED — not a real position' : trip.speedSource,
     trip.simulating ? 'bad' : '');
+
+  // The closed Troubleshooting row carries a one-word verdict, so a driver can
+  // tell at a glance whether anything in there needs them — without opening a
+  // panel of GPS internals they should never have to read.
+  const summary = $('diagSummary');
+  const disclosure = $('diagDisclosure');
+  const healthy = trip.usableFixCount > 0 && !trip.simulating;
+  if (summary) {
+    summary.textContent = trip.simulating ? 'simulated drive'
+      : !window.isSecureContext ? 'blocked — needs https'
+      : perm === 'denied' ? 'location blocked'
+      : trip.usableFixCount > 0 ? 'GPS working'
+      : trip.fixCount > 0 ? 'no speed from this device'
+      : 'waiting for GPS';
+  }
+  // Only a genuine fault colours the row. A simulation is deliberate, and
+  // "waiting" is not yet a problem.
+  if (disclosure) {
+    disclosure.classList.toggle('attention',
+      !healthy && !trip.simulating && (perm === 'denied' || !window.isSecureContext
+        || (trip.fixCount > 0 && trip.usableFixCount === 0)));
+  }
 
   // Reporting a problem is only half the job — say what to do about it.
   const advice = $('diagAdvice');

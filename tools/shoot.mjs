@@ -37,6 +37,21 @@ async function shot(page, name, opts = {}) {
   }
 }
 
+/**
+ * Open a <details> panel.
+ *
+ * The advanced controls now fold away so a driver is not faced with a wall of
+ * them, which means anything inside one is genuinely not clickable until it is
+ * opened — the same step a real user takes.
+ */
+async function openPanel(page, id) {
+  await page.evaluate((elId) => {
+    const d = document.getElementById(elId);
+    if (d) d.open = true;
+  }, id);
+  await page.waitForTimeout(250);
+}
+
 /** Console errors and unhandled rejections are as interesting as the pixels. */
 function watch(page, sink) {
   page.on('console', (m) => {
@@ -193,6 +208,7 @@ async function run(label, viewport, { denyGeo = false } = {}) {
       // Both controls live in the sheet body, so it has to be open to click them.
       await page.click('#driveToggle');
       await page.waitForTimeout(500);
+      await openPanel(page, 'diagDisclosure');
       await page.click('#simToggle');
       await page.waitForTimeout(6000);
       await setSheet(true);
@@ -297,6 +313,12 @@ async function runRoute() {
     );
 
     // ---- Simulate driving it ----------------------------------------------
+    // Expand the sheet BEFORE opening the panel inside it: a <details> can be
+    // open and still invisible when an ancestor is display:none. Relying on
+    // GPS failure to expand the sheet for us was a side-effect, not a step.
+    await page.evaluate(() => document.getElementById('navSheet').classList.add('expanded'));
+    await page.waitForTimeout(300);
+    await openPanel(page, 'diagDisclosure');
     await page.click('#simToggle');
     const samples = [];
     for (let i = 0; i < 6; i++) {
@@ -357,10 +379,105 @@ async function runRoute() {
   await browser.close();
 }
 
+/**
+ * The countdown pass.
+ *
+ * "Battery empty in" is `remaining energy / draw`. Because the draw is a
+ * DENOMINATOR, anything that makes it drift makes the headline move
+ * hyperbolically — and a 30-second average of the draw once shed SIX HOURS PER
+ * SECOND while the kW tile sat perfectly still:
+ *
+ *     67h 45m -> 27h 46m -> 21h 39m -> 17h 51m -> 15h 15m ...
+ *
+ * At a steady speed the headline may only fall at real time: ten seconds of
+ * driving costs ten seconds of range, not ten hours. That is what this checks.
+ */
+async function runCountdown() {
+  const label = 'countdown';
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    locale: 'en-GB',
+    timezoneId: 'Africa/Cairo',
+  });
+  const page = await context.newPage();
+  const errors = [];
+  watch(page, errors);
+
+  /** "2h 46m" / "45 min" / "99h+" -> minutes. */
+  const toMinutes = (s) => {
+    if (!s || s.includes('+') || s.includes('—')) return null;
+    const h = /(\d+)\s*h/.exec(s);
+    const m = /(\d+)\s*m/.exec(s);
+    return (h ? +h[1] * 60 : 0) + (m ? +m[1] : 0);
+  };
+
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
+    await fillSetup(page);
+    await page.click('#startTrip');
+    await page.waitForSelector('#screen-live.active', { timeout: 8000 });
+    await page.waitForTimeout(3500);
+
+    const paused = await page.evaluate(() => ({
+      label: document.getElementById('heroLabel').textContent,
+      hero: document.getElementById('lTimeToEmpty').textContent,
+    }));
+
+    await page.click('#driveToggle');
+
+    const samples = [];
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(1000);
+      samples.push(await page.evaluate(() => ({
+        hero: document.getElementById('lTimeToEmpty').textContent,
+        kw: document.getElementById('lPower').textContent,
+      })));
+    }
+
+    // 1. Starting to drive must not move the figure much: paused already
+    //    projects at the speed you intend to hold, so there is nothing to jump
+    //    from. Allow a few minutes for rounding and real elapsed drain.
+    const pausedMin = toMinutes(paused.hero);
+    const firstMin = toMinutes(samples[0].hero);
+    const startJump = Math.abs(firstMin - pausedMin);
+    log(`${label}-no-jump-on-start`, startJump <= 5,
+      `${paused.hero} -> ${samples[0].hero} (${startJump} min)`);
+
+    // 2. Across ten seconds of steady driving the headline may fall by at most
+    //    a couple of minutes. The old behaviour lost fifteen HOURS here.
+    const mins = samples.map((s) => toMinutes(s.hero)).filter((m) => m !== null);
+    const totalDrop = mins[0] - mins[mins.length - 1];
+    log(`${label}-falls-at-real-time`, totalDrop >= 0 && totalDrop <= 3,
+      `${samples[0].hero} -> ${samples[samples.length - 1].hero} = ${totalDrop} min over ${mins.length}s`);
+
+    // 3. No single second may lose more than a minute.
+    let worstStep = 0;
+    for (let i = 1; i < mins.length; i++) worstStep = Math.max(worstStep, mins[i - 1] - mins[i]);
+    log(`${label}-no-cliff`, worstStep <= 2, `worst single-second drop ${worstStep} min`);
+
+    // 4. The power reading must be steady too — if it is not, a moving
+    //    headline would be honest and this test would be measuring the wrong
+    //    thing.
+    const kws = [...new Set(samples.map((s) => s.kw))];
+    log(`${label}-draw-steady`, kws.length <= 2, `kW values seen: ${kws.join(', ')}`);
+
+    log(`${label}-pausedlabel`, /battery would last/i.test(paused.label), paused.label);
+  } catch (err) {
+    log(`${label}-run`, false, err.message);
+  }
+
+  if (errors.length) log(`${label}-page-errors`, false, errors.slice(0, 8).join(' || '));
+  else log(`${label}-page-errors`, true, 'none');
+
+  await browser.close();
+}
+
 await mkdir(OUT, { recursive: true });
 await run('mobile', { width: 390, height: 844 });
 await run('desktop', { width: 1280, height: 800 }, { denyGeo: true });
 await runRoute();
+await runCountdown();
 
 await writeFile(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 const failed = report.filter((r) => !r.ok);
