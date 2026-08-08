@@ -1132,6 +1132,122 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
 
 .disclosure .trip-log { display: flex; justify-content: space-between; gap: 8px; }
 
+/* ===========================================================================
+   VISUAL REFINEMENT
+   ---------------------------------------------------------------------------
+   The palette and layout were already right; what was missing was depth and
+   hierarchy. Every card looked identical, so nothing led the eye, and the
+   search list was a column of grey squares.
+
+   Nothing here changes a size, a hit target or a contrast ratio — the app
+   still has to be readable at a glance in a moving car, which is a stronger
+   constraint than looking nice.
+   ======================================================================== */
+
+/* Cards gain a hairline of light along the top edge, the way a raised surface
+   catches light. One pixel, and they stop reading as flat rectangles.
+
+   NOTE: no `position` here. An earlier version added `position: relative` to
+   this list, which included `.sheet` — and that overrode the sheet's
+   `position: absolute`, so the bottom sheet fell into normal flow and covered
+   the map controls. Only the one element that needs a positioned parent for a
+   pseudo-element gets one, below. */
+.card, .disclosure, .tile, .hero {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .25);
+}
+
+/* The prediction is the whole point of the setup screen, so it stops looking
+   like just another card. */
+.card.result {
+  position: relative;
+  background:
+    radial-gradient(140% 90% at 50% 0%, rgba(56, 224, 138, .10), transparent 65%),
+    var(--bg-card);
+  border-color: rgba(56, 224, 138, .28);
+}
+.card.result::before {
+  content: '';
+  position: absolute; inset: -1px -1px auto -1px; height: 2px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: .55;
+}
+
+/* Search results: tint the icon by category. Finding the city among fifteen
+   shops becomes a colour judgement rather than a reading task. */
+.sg-icon { transition: background .15s, border-color .15s; }
+.suggestions li[data-kind="city"]   .sg-icon { background: rgba(74,168,255,.13); border-color: rgba(74,168,255,.30); }
+.suggestions li[data-kind="city"]   .sg-icon svg { stroke: var(--k-aero); }
+.suggestions li[data-kind="road"]   .sg-icon { background: rgba(255,179,64,.12); border-color: rgba(255,179,64,.28); }
+.suggestions li[data-kind="road"]   .sg-icon svg { stroke: var(--k-roll); }
+.suggestions li[data-kind="charge"] .sg-icon { background: rgba(56,224,138,.14); border-color: rgba(56,224,138,.32); }
+.suggestions li[data-kind="charge"] .sg-icon svg { stroke: var(--accent); }
+.suggestions li[data-kind="rail"]   .sg-icon,
+.suggestions li[data-kind="air"]    .sg-icon { background: rgba(192,125,255,.12); border-color: rgba(192,125,255,.28); }
+.suggestions li[data-kind="rail"]   .sg-icon svg,
+.suggestions li[data-kind="air"]    .sg-icon svg { stroke: var(--k-grade); }
+.suggestions li[data-kind="home"]   .sg-icon svg { stroke: var(--text); }
+
+.suggestions li[data-kind="poi"]    .sg-icon { background: rgba(232,238,252,.07); }
+.suggestions li[data-kind="poi"]    .sg-icon svg { stroke: var(--text); }
+
+/* On a phone the address is the part that gets squeezed, and the address is
+   how you tell two branches of the same chain apart. Buy it room back from
+   the icon and the gaps rather than from the text. */
+@media (max-width: 460px) {
+  .suggestions li { gap: 9px; padding: 9px 9px; }
+  .sg-icon { width: 28px; height: 28px; border-radius: 8px; }
+  .sg-icon svg { width: 15px; height: 15px; }
+}
+
+/* The distance badge earns a little emphasis: after the location work, it is
+   the fastest way to tell "this is the one near me" from "this is not".
+   Kept deliberately tight — at 390 px wide every pixel it takes is a pixel of
+   address the reader loses, and "Al Amir Qadad…" helps nobody. */
+.sg-dist {
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  align-self: center;
+  flex: none;
+  white-space: nowrap;
+}
+
+/* "Searching…" gets a moving sheen, so a slow geocoder reads as working
+   rather than stuck. This matters more than it looks: when one provider is
+   unreachable a search legitimately takes a few seconds. */
+.suggestions li.loading {
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(56,224,138,.10) 45%, rgba(56,224,138,.10) 55%, transparent 100%);
+  background-size: 220% 100%;
+  animation: sheen 1.3s ease-in-out infinite;
+}
+@keyframes sheen {
+  from { background-position: 120% 0; }
+  to   { background-position: -20% 0; }
+}
+
+/* The chosen segment gets a little lift instead of a flat fill. */
+.segmented button.on {
+  box-shadow: 0 2px 8px rgba(56, 224, 138, .28);
+}
+.segmented button:not(.on):hover { background: rgba(255, 255, 255, .04); color: var(--text); }
+
+/* A live countdown that changes width as its digits change is unreadable at a
+   glance, and every one of these updates once a second. */
+.route-alt-time, .nav-eta b, .nav-eta .eta-value,
+.diag-value, .chip b, .sheet .hero-clock {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rounded ends on the energy bar, and a touch of separation between segments. */
+.bar { border-radius: 999px; overflow: hidden; }
+.seg + .seg { box-shadow: inset 1px 0 0 rgba(11, 18, 32, .55); }
+
 /* ---- Sheet on a wide screen ---------------------------------------------
    A bottom sheet is a phone idea. Stretched across a 1280px desktop it made
    the "Start driving" button nearly two metres of green with its label

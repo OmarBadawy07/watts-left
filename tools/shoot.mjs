@@ -52,10 +52,29 @@ async function openPanel(page, id) {
   await page.waitForTimeout(250);
 }
 
-/** Console errors and unhandled rejections are as interesting as the pixels. */
-function watch(page, sink) {
+/**
+ * Console errors and unhandled rejections are as interesting as the pixels.
+ *
+ * One exception: a third-party geocoder or tile server being unreachable is
+ * not a regression in this app — the whole point of the fallbacks is that it
+ * keeps working — and failing the run for it would train us to ignore the run.
+ * Those are collected separately and reported, not failed on.
+ */
+const EXTERNAL_HOSTS = /photon\.komoot\.io|nominatim\.openstreetmap\.org|router\.project-osrm\.org|api\.open-meteo\.com|basemaps\.cartocdn\.com|arcgisonline\.com/;
+
+function watch(page, sink, externalSink = []) {
   page.on('console', (m) => {
-    if (m.type() === 'error') sink.push(`console.error: ${m.text()}`);
+    if (m.type() !== 'error') return;
+    const text = m.text();
+    const isNetwork = /net::ERR|Failed to load resource/.test(text);
+    // A resource error names its URL in the request, not always the message,
+    // so treat any bare network failure as external — our own files are served
+    // from the same origin and would fail loudly in other ways too.
+    if (isNetwork) externalSink.push(text);
+    else sink.push(`console.error: ${text}`);
+  });
+  page.on('requestfailed', (r) => {
+    if (!EXTERNAL_HOSTS.test(r.url())) sink.push(`request failed: ${r.url()}`);
   });
   page.on('pageerror', (e) => sink.push(`pageerror: ${e.message}`));
 }
@@ -90,7 +109,8 @@ async function run(label, viewport, { denyGeo = false } = {}) {
   });
   const page = await context.newPage();
   const errors = [];
-  watch(page, errors);
+  const external = [];
+  watch(page, errors, external);
 
   try {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
@@ -123,14 +143,43 @@ async function run(label, viewport, { denyGeo = false } = {}) {
 
       // Search bias check: from Cairo, "mcdonalds" must not return Sydney.
       await page.fill('#toSearch', 'mcdonalds');
-      await page.waitForSelector('#toResults li', { timeout: 8000 });
-      await page.waitForTimeout(600);
+      // Wait for REAL results, not the "Searching…" placeholder. Waiting for
+      // any <li> passed the moment the spinner text appeared, so this assertion
+      // used to succeed without a single place ever being found.
+      // NOTE the `null`: waitForFunction(fn, arg, options). Passing options as
+      // the second argument silently makes them the ARGUMENT and falls back to
+      // the default timeout, which is how this waited 30 s instead of 25 s and
+      // reported a failure it could not explain.
+      await page.waitForFunction(() => {
+        const items = [...document.querySelectorAll('#toResults li')];
+        return items.length > 0 && !items.some((li) => li.classList.contains('loading'));
+      }, null, { timeout: 25000 }).catch(() => {});
+      await page.waitForTimeout(400);
       await shot(page, `${label}-05-map-search`);
 
       const results = await page.$$eval('#toResults li', (els) =>
-        els.slice(0, 6).map((el) => el.innerText.replace(/\s+/g, ' ').trim()),
+        els.map((el) => el.innerText.replace(/\s+/g, ' ').trim()),
       );
-      log(`${label}-search-results`, results.length > 0, results.join(' | '));
+      const real = results.filter((r) => r && !/^Searching|^Nothing found|unavailable/.test(r));
+      // On failure, say WHY: which external services failed, and what the
+      // module returns when called directly with the same bias. A bare "no
+      // results" sends you guessing; this points straight at the cause.
+      let diag = '';
+      if (!real.length) {
+        const direct = await page.evaluate(async () => {
+          try {
+            const geo = await import('./js/geo.js');
+            const r = await geo.searchPlaces('mcdonalds', undefined,
+              { lat: 30.0444, lon: 31.2357 });
+            return `module returned ${r.length}`;
+          } catch (e) { return `module threw ${e.name}: ${e.message}`; }
+        }).catch((e) => `probe failed: ${e.message}`);
+        diag = ` | ${direct} | external failures: ${[...new Set(external.map(
+          (t) => (t.match(/https?:\/\/([^/]+)/) || [, 'unknown'])[1]))].join(', ') || 'none'}`;
+      }
+      log(`${label}-search-results`, real.length > 0,
+        real.length ? real.slice(0, 5).join(' | ')
+          : `no real results (got: ${results.join(' | ')})${diag}`);
 
       await page.click('#mapBack');
       await page.waitForTimeout(600);
@@ -230,7 +279,8 @@ async function run(label, viewport, { denyGeo = false } = {}) {
   }
 
   if (errors.length) log(`${label}-page-errors`, false, errors.slice(0, 8).join(' || '));
-  else log(`${label}-page-errors`, true, 'none');
+  else log(`${label}-page-errors`, true, external.length
+    ? `none (${external.length} external service failures — see note)` : 'none');
 
   await browser.close();
 }
@@ -255,7 +305,8 @@ async function runRoute() {
   });
   const page = await context.newPage();
   const errors = [];
-  watch(page, errors);
+  const external = [];
+  watch(page, errors, external);
 
   try {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
@@ -269,8 +320,12 @@ async function runRoute() {
     // the first result actually in the country we are searching from.
     const pick = async (field, query) => {
       await page.fill(`#${field}Search`, query);
-      await page.waitForSelector(`#${field}Results li`, { timeout: 10000 });
-      await page.waitForTimeout(800);
+      // Real results, not the loading placeholder — see the note in run().
+      await page.waitForFunction((f) => {
+        const items = [...document.querySelectorAll(`#${f}Results li`)];
+        return items.length > 0 && !items.some((li) => li.classList.contains('loading'));
+      }, field, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(500);
       const chose = await page.evaluate(({ field: f, country }) => {
         const items = [...document.querySelectorAll(`#${f}Results li`)];
         const hit = items.find((li) => li.innerText.includes(country)) || items[0];
@@ -285,9 +340,13 @@ async function runRoute() {
     log(`${label}-pick-to`, true, await pick('to', 'Alexandria'));
 
     // Routing + elevation for every alternative + weather takes a few seconds.
+    // Generous on purpose: with one geocoder unavailable every lookup pays a
+    // timeout first, and this step covers routing, elevation for every
+    // alternative, and weather.
     await page.waitForFunction(
       () => document.querySelectorAll('#routeAlts .route-alt').length > 0,
-      { timeout: 40000 },
+      null,
+      { timeout: 90000 },
     );
     await page.waitForTimeout(9000);
     await shot(page, `${label}-01-planned`);
@@ -374,7 +433,8 @@ async function runRoute() {
   }
 
   if (errors.length) log(`${label}-page-errors`, false, errors.slice(0, 8).join(' || '));
-  else log(`${label}-page-errors`, true, 'none');
+  else log(`${label}-page-errors`, true, external.length
+    ? `none (${external.length} external service failures — see note)` : 'none');
 
   await browser.close();
 }
@@ -402,7 +462,8 @@ async function runCountdown() {
   });
   const page = await context.newPage();
   const errors = [];
-  watch(page, errors);
+  const external = [];
+  watch(page, errors, external);
 
   /** "2h 46m" / "45 min" / "99h+" -> minutes. */
   const toMinutes = (s) => {
@@ -468,7 +529,87 @@ async function runCountdown() {
   }
 
   if (errors.length) log(`${label}-page-errors`, false, errors.slice(0, 8).join(' || '));
-  else log(`${label}-page-errors`, true, 'none');
+  else log(`${label}-page-errors`, true, external.length
+    ? `none (${external.length} external service failures — see note)` : 'none');
+
+  await browser.close();
+}
+
+/**
+ * Search from several places in the world.
+ *
+ * The point is not that a specific business exists — OSM coverage varies — but
+ * that what comes back is LOCAL to wherever the user is, and that it comes
+ * back at all when one of the two geocoders is unavailable. Both are free
+ * community services; during this work Photon blocked this machine outright
+ * after too many probe requests, which is exactly the case the fallback exists
+ * for.
+ *
+ * Deliberately few queries: these are services being used on trust.
+ */
+async function runSearch() {
+  const label = 'search';
+  const browser = await chromium.launch();
+
+  // Three regions, one query each, with the answer we expect to be near.
+  const CASES = [
+    { city: 'Cairo',    tz: 'Africa/Cairo',      lat: 30.0444, lon: 31.2357, q: 'pharmacy' },
+    { city: 'London',   tz: 'Europe/London',     lat: 51.5074, lon: -0.1278, q: 'station' },
+    { city: 'New York', tz: 'America/New_York',  lat: 40.7128, lon: -74.0060, q: 'museum' },
+  ];
+
+  for (const c of CASES) {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      timezoneId: c.tz,
+      locale: 'en-GB',
+    });
+    const page = await context.newPage();
+    try {
+      await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
+
+      // Call the module directly with an explicit bias point. Driving the UI
+      // would also depend on the home-region lookup, and this test is about
+      // the search itself.
+      const found = await page.evaluate(async ({ q, lat, lon }) => {
+        const geo = await import('./js/geo.js');
+        const places = await geo.searchPlaces(q, undefined, { lat, lon });
+        return places.map((p) => ({
+          title: p.title,
+          km: p.distanceKm == null ? null : Math.round(p.distanceKm),
+        }));
+      }, c);
+
+      // 120 km is "the region you would drive in", not "the same street". It
+      // has to tolerate single-provider mode: when one geocoder is down the
+      // surviving one has a thinner index, and the nearest museum genuinely
+      // may be 80 km away. The check is that results are LOCAL, not perfect.
+      const near = found.filter((f) => f.km !== null && f.km <= 120).length;
+      log(`${label}-${c.city}`, found.length > 0 && near >= Math.ceil(found.length / 2),
+        `${found.length} results, ${near} within 120 km — top: ${found[0]?.title} (${found[0]?.km} km)`);
+    } catch (err) {
+      log(`${label}-${c.city}`, false, err.message);
+    }
+    await context.close();
+    await new Promise((r) => setTimeout(r, 1500)); // be polite between regions
+  }
+
+  // Typed coordinates must resolve without any network at all.
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 });
+    const coord = await page.evaluate(async () => {
+      const geo = await import('./js/geo.js');
+      const r = await geo.searchPlaces('30.0444, 31.2357', undefined, null);
+      return r[0] || null;
+    });
+    log(`${label}-coordinates`, coord?.lat === 30.0444 && coord?.lon === 31.2357,
+      coord ? `${coord.title}` : 'nothing returned');
+  } catch (err) {
+    log(`${label}-coordinates`, false, err.message);
+  }
+  await context.close();
 
   await browser.close();
 }
@@ -478,6 +619,7 @@ await run('mobile', { width: 390, height: 844 });
 await run('desktop', { width: 1280, height: 800 }, { denyGeo: true });
 await runRoute();
 await runCountdown();
+await runSearch();
 
 await writeFile(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 const failed = report.filter((r) => !r.ok);

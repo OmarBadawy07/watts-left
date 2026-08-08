@@ -74,6 +74,10 @@ export function attachPicker({
       const { title, sub, kind, meta } = render(item);
       const li = el('li');
       li.dataset.idx = String(idx);
+      // The category drives the icon tint, which is what makes a long list
+      // scannable — you find the city among the shops by colour before you
+      // have read a single word.
+      li.dataset.kind = kind || 'pin';
       li.setAttribute('role', 'option');
 
       const iconWrap = el('div', 'sg-icon');

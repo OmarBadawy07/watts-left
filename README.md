@@ -445,7 +445,7 @@ styles.css            dark, high-contrast, 40px+ touch targets for in-car use
 js/geometry.js        great-circle maths — one haversine, one signature
 js/physics.js         the energy model — heavily commented, no UI or network
 js/cars.js            201 EVs across 76 brands, including vans and pickups
-js/geo.js             place search, geocoding, elevation profile, weather
+js/geo.js             place search (2 geocoders + ranking), elevation, weather
 js/navigation.js      routing, turn-by-turn, snap-to-route, voice, basemaps
 
 js/dom.js             $, el, icons, and the small formatters
@@ -575,6 +575,35 @@ The service worker is **not registered on localhost**, deliberately. It is
 cache-first, which is right for the product but poison for development: every
 edit appears to do nothing until you bump the cache name. Deployed over HTTPS it
 registers normally and the app is fully installable and offline-capable.
+
+### How search finds things anywhere
+
+Four things have to hold for a search box to feel like a maps app:
+
+1. **It knows roughly where you are before you type**, with no permission
+   prompt — the IANA timezone is a city name, so `Africa/Cairo` geocodes to
+   Cairo. Without a bias point a geocoder ranks by global fame and "pharmacy"
+   from Cairo returns Sydney.
+2. **It asks both engines.** Photon is built for type-ahead and partial names;
+   Nominatim is authoritative for a full address with a house number. They run
+   together, not one as the other's fallback.
+3. **It ranks the merged list itself** (`rankPlaces`). Provider ordering does
+   not survive a merge, and the balance between "near me" and "what I typed"
+   is a product decision. The exact-match bonus is an *invariant*: it must
+   outscore the best possible partial match, so "Berlin" typed in Cairo returns
+   Berlin, Germany rather than a Berlin Street round the corner.
+4. **It survives a provider going down.** Every request has a 4-second
+   deadline, and two failures put Photon behind a two-minute circuit breaker —
+   otherwise every keystroke pays the timeout. Verified during development
+   when Photon IP-blocked this machine: search kept working on Nominatim alone.
+
+The Photon bias parameters were set by measurement, not feel — see
+`tools/probe-geocoder.mjs` and the note in `searchPhoton()`. Run those probes
+sparingly; they are free community services and it is easy to get blocked.
+
+```bash
+cd tools && node test-search.mjs      # ranking tests, no network needed
+```
 
 ### Deploying
 

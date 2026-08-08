@@ -34,7 +34,14 @@ export const ICONS = {
   rail: '<rect x="6" y="3.5" width="12" height="12" rx="3"/><path d="M8.5 19 6.5 21M15.5 19l2 2M6 15.5h12"/><circle cx="9.3" cy="9" r="1"/><circle cx="14.7" cy="9" r="1"/>',
   air: '<path d="M21 3 3.5 10.2l6.8 3.5L13.8 20z"/>',
   charge: '<path d="M13 2.5 6 13h5l-1 8.5L18 11h-5z"/>',
-  poi: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  // A storefront: awning, walls, doorway.
+  //
+  // This slot has now been wrong twice, which is worth recording. It was a
+  // clock face, so a restaurant read as "opening hours". Then it was a
+  // shopping bag, and in outline at 15 px a bag is indistinguishable from a
+  // rubbish bin — an icon meaning "delete" next to every search result. A
+  // shape only works if it survives being drawn small in one stroke weight.
+  poi: '<path d="M4 9.5h16M5.7 9.5V20h12.6V9.5"/><path d="M4 9.5 6.1 4h11.8l2.1 5.5"/><path d="M9.8 20v-4.8h4.4V20"/>',
   home: '<path d="M3.5 11 12 4l8.5 7M6 9.7V20h12V9.7"/>',
   car: '<path d="M4 15h16M6 15l1.6-5.2A2 2 0 0 1 9.5 8.4h5a2 2 0 0 1 1.9 1.4L18 15M4 15v3M20 15v3"/><circle cx="7.5" cy="18" r="1.4"/><circle cx="16.5" cy="18" r="1.4"/>',
 };
