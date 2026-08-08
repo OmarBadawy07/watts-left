@@ -137,33 +137,118 @@ export function paintClimateCosts(cond, groupId, speedKmh = cond.speedKmh) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The descent plot
+// ---------------------------------------------------------------------------
+
+// The SVG's own coordinate space. Everything below is computed in it, and the
+// element is scaled to whatever width the screen gives it.
+// A few pixels of headroom at the top so the line starts just below the
+// frame rather than exactly in its corner, where it read as clipped.
+const PLOT = { w: 360, h: 156, top: 7 };
+
 /**
- * The battery track: the entire prediction as one picture.
+ * Draw the charge falling over distance.
  *
- * Left to right is 100% of the pack down to 0%, so the bar drains the way a
- * fuel gauge does. The solid part is what you arrive with, the dimmed part is
- * what the trip eats, and the notch is the reserve. If the solid part ends
- * before the notch you are under your reserve, which you can see without
- * reading any of the numbers.
+ * WHY A PLOT AND NOT A BIG PERCENTAGE
+ * A percentage answers "do I make it" and stops there. This shape answers
+ * three questions at once, and two of them are the reason the app exists:
+ *
+ *   - the RATE. How steeply the charge is going down is the thing speed and
+ *     climate actually change, and it is invisible in a single number.
+ *   - the CROSSING. Where the line enters the reserve you promised yourself
+ *     — which may be well before the destination even on a trip you "make".
+ *   - the COUNTERFACTUAL. A second, dimmer line for 20 km/h slower. That was
+ *     previously a sentence of advice underneath; as a line you can see
+ *     immediately whether easing off is worth anything on THIS trip.
+ *
+ * The vertical axis runs 0 to your current charge rather than 0 to 100, so
+ * the plot is always full and the slope is always readable. The horizontal
+ * runs to whichever comes first-and-last: your destination, or the point the
+ * battery reaches zero. Both always fit.
  */
-function renderTrack(cond, p) {
-  const now = Math.max(0, Math.min(100, cond.socPercent));
-  const arrival = Math.max(0, Math.min(now, p.arrivalSoc));
-  const spend = Math.max(0, now - arrival);
+function renderPlot(cond, p) {
+  const soc = Math.max(1, Math.min(100, cond.socPercent));
+  const trip = Math.max(0, cond.tripKm);
+  const dead = Math.max(0.1, p.kmToEmpty);
 
-  $('pTrackLeft').style.width = `${arrival}%`;
-  $('pTrackSpend').style.left = `${arrival}%`;
-  $('pTrackSpend').style.width = `${spend}%`;
+  // 20 km/h slower, floored at 40 — below that the per-hour climate load
+  // starts costing more than the drag it saves and the advice inverts.
+  const slower = Math.max(40, cond.speedKmh - 20);
+  const hasGhost = slower < cond.speedKmh - 1;
+  const slowDead = hasGhost
+    ? Math.max(0.1, predict({ ...cond, speedKmh: slower }).kmToEmpty)
+    : 0;
 
-  const mark = $('pTrackReserve');
-  mark.style.left = `${Math.min(100, cond.reservePercent)}%`;
-  mark.classList.toggle('hidden', cond.reservePercent <= 0);
+  // The axis has to span everything that gets drawn — the destination, where
+  // the charge runs out, AND where it would run out if you eased off. Leaving
+  // the ghost out of this let it draw straight through the panel's edge.
+  const xMax = Math.max(trip, dead, slowDead) * 1.04 || 1;
+  const X = (km) => (km / xMax) * PLOT.w;
+  const Y = (pct) => PLOT.top + (1 - Math.max(0, pct) / soc) * (PLOT.h - PLOT.top);
 
-  $('pKeyLeft').textContent = `${Math.round(arrival)}% on arrival`;
-  $('pKeySpend').textContent = cond.tripKm > 0
-    ? `${Math.round(spend)}% for ${Math.round(cond.tripKm)} km`
-    : 'no trip set';
-  $('pKeyReserve').textContent = `${Math.round(cond.reservePercent)}% reserve`;
+  // --- The reserve floor ---------------------------------------------------
+  const reserveY = Y(Math.min(soc, cond.reservePercent));
+  const rsv = $('plotReserve');
+  rsv.setAttribute('y', reserveY.toFixed(1));
+  rsv.setAttribute('height', Math.max(0, PLOT.h - reserveY).toFixed(1));
+  $('plotReserveEdge').setAttribute('y1', reserveY.toFixed(1));
+  $('plotReserveEdge').setAttribute('y2', reserveY.toFixed(1));
+  const showReserve = cond.reservePercent > 0 && cond.reservePercent < soc;
+  rsv.style.display = showReserve ? '' : 'none';
+  $('plotReserveEdge').style.display = showReserve ? '' : 'none';
+
+  // --- Gridlines: quarters of the charge on screen -------------------------
+  $('plotGrid').innerHTML = [0.25, 0.5, 0.75]
+    .map((f) => {
+      const y = Y(soc * (1 - f)).toFixed(1);
+      return `<line x1="0" x2="${PLOT.w}" y1="${y}" y2="${y}"/>`;
+    })
+    .join('');
+
+  // --- The line, and the ghost ---------------------------------------------
+  // Consumption is constant across the trip at fixed conditions, so charge
+  // falls linearly with distance. Drawing it as a straight line is not a
+  // simplification — it is what the model says. The information is in the
+  // SLOPE and in where it crosses things.
+  $('plotLine').setAttribute('d', `M0 ${Y(soc).toFixed(1)} L${X(dead).toFixed(1)} ${PLOT.h}`);
+
+  const ghost = $('plotGhost');
+  const key = $('plotGhostKey');
+  const worthShowing = hasGhost && slowDead > dead * 1.01;
+  ghost.setAttribute('d', `M0 ${Y(soc).toFixed(1)} L${X(slowDead).toFixed(1)} ${PLOT.h}`);
+  ghost.style.display = worthShowing ? '' : 'none';
+  key.textContent = worthShowing ? `at ${slower} km/h` : '';
+
+  // --- The destination -----------------------------------------------------
+  const destX = X(Math.min(trip, xMax));
+  const dest = $('plotDest');
+  dest.setAttribute('x1', destX.toFixed(1));
+  dest.setAttribute('x2', destX.toFixed(1));
+  dest.style.display = trip > 0 ? '' : 'none';
+
+  const arrival = p.arrivalSoc;
+  const dot = $('plotDot');
+  const showDot = trip > 0 && arrival >= 0;
+  dot.classList.toggle('hidden', !showDot);
+  if (showDot) {
+    dot.setAttribute('cx', destX.toFixed(1));
+    dot.setAttribute('cy', Y(arrival).toFixed(1));
+  }
+
+  // --- The two readouts above the plot ------------------------------------
+  $('plotTop').textContent = `${Math.round(soc)}%`;
+  $('pArrival').textContent = trip > 0 ? Math.max(0, Math.round(arrival)) : '—';
+
+  const head = $('plotArrivalHead');
+  const atPct = (trip > 0 ? destX : PLOT.w) / PLOT.w;
+  head.style.left = `${atPct * 100}%`;
+  // Centred on the destination rule, except near the right edge, where a
+  // centred label would hang off the panel. There it anchors to its right.
+  head.classList.toggle('edge-right', atPct > 0.86);
+  head.style.visibility = trip > 0 ? '' : 'hidden';
+
+  $('plotXMax').textContent = `${Math.round(xMax)} km`;
 }
 
 /** Recompute and repaint the setup screen. Cheap enough to run on every input. */
@@ -188,10 +273,10 @@ export function render() {
     ? `${Math.round(cond.tripKm)} km · ${state.tripMode === 'route' ? 'planned route' : 'entered by hand'}`
     : '';
 
-  renderTrack(cond, p);
+  renderPlot(cond, p);
 
   const reserve = cond.reservePercent;
-  const result = $('setupResult');
+  const panel = $('setupResult');
   let status = 'ok';
   if (cond.tripKm <= 0) {
     status = 'tight';
@@ -205,14 +290,16 @@ export function render() {
     setVerdict($('pVerdict'), 'tight',
       `You arrive with <strong>${Math.round(p.arrivalSoc)}%</strong> — below your ${reserve}% reserve.`);
   } else {
+    const clear = Math.round(p.arrivalSoc - reserve);
     setVerdict($('pVerdict'), 'ok',
-      `You make it with <strong>${Math.round(p.arrivalSoc)}%</strong> to spare.`);
+      `Arrives with <strong>${Math.round(p.arrivalSoc)}%</strong> — `
+      + `${clear} points clear of your ${reserve}% reserve.`);
   }
   // The status drives the colour of the hero and the track. It is never the
   // only signal — the verdict below always says it in words, and carries an
   // icon — because the amber and green here are a pair that protanopes and
   // deuteranopes cannot reliably tell apart.
-  for (const s of ['ok', 'tight', 'bad']) result.classList.toggle(s, s === status);
+  for (const s of ['ok', 'tight', 'bad']) panel.classList.toggle(s, s === status);
 
   renderBreakdown(p.breakdown, {
     bar: 'pBar', aero: 'lgAero', roll: 'lgRoll', grade: 'lgGrade', aux: 'lgAux',
@@ -306,13 +393,8 @@ function buildAdvice(cond, p) {
         tips.push(`Your climate setting is costing about <strong>${Math.round(gained)} km</strong> of range.`);
       }
     }
-    if (cond.speedKmh >= 100) {
-      const slower = predict({ ...cond, speedKmh: cond.speedKmh - 10 });
-      const gained = slower.kmToEmpty - p.kmToEmpty;
-      if (gained >= 5) {
-        tips.push(`Dropping 10 km/h would add roughly <strong>${Math.round(gained)} km</strong> of range — drag rises with the square of speed.`);
-      }
-    }
+    // No "slowing down would add N km" tip here any more — the dashed line on
+    // the plot above says it better, and saying it twice is clutter.
   }
 
   // A meaningful "sweet spot" only exists when the climate system's per-hour

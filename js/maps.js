@@ -28,9 +28,9 @@ const DEFAULT_VIEW = [30.04, 31.24];
 /* Route line colours. Kept here rather than inline so they stay in step with
    the stylesheet's --ok: a route drawn in last season's green beside a verdict
    in this season's is the kind of drift nobody notices until it looks cheap. */
-const ROUTE_COLOR = '#35c97b';      // the chosen route
-const ROUTE_ALT_COLOR = '#78828f';  // alternatives, dashed and behind
-const ROUTE_DONE_COLOR = '#4b535c'; // road already covered
+const ROUTE_COLOR = '#ffae1a';      // the chosen route — the instrument lamp
+const ROUTE_ALT_COLOR = '#8a7e6c';  // alternatives, dashed and behind
+const ROUTE_DONE_COLOR = '#544a3c'; // road already covered
 
 // ---------------------------------------------------------------------------
 // Construction

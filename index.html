@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <meta name="theme-color" content="#0b1220" />
+  <meta name="theme-color" content="#14110d" />
   <meta name="description" content="Live electric-vehicle range prediction and navigation that accounts for speed, climate control, temperature, wind and terrain." />
   <title>Watt's Left — live EV range</title>
 
@@ -35,6 +35,97 @@
     </div>
     <p class="tagline">Range that knows about your right foot and your AC.</p>
   </header>
+
+  <!-- ================================================================
+       THE INSTRUMENT PANEL
+
+       This leads the page. The inputs below it all have sensible defaults —
+       a car is already chosen, the charge is set — so there is an answer to
+       show from the first frame, and burying it under four cards of form
+       meant scrolling past everything to reach the only thing you came for.
+
+       The plot is the app's whole argument in one picture: charge falling
+       over distance, the reserve as a floor you can watch yourself approach,
+       your destination marked on it, and a second line showing what easing
+       off would do. It replaces a large percentage, a bar, and a paragraph
+       of prose that all said parts of the same thing.
+       ================================================================= -->
+  <section class="panel" id="setupResult">
+    <div class="panel-rail">
+      <span class="panel-eyebrow">Prediction</span>
+      <span class="panel-trip" id="pTripNote"></span>
+    </div>
+
+    <figure class="plot">
+      <div class="plot-heads">
+        <span class="plot-head now">
+          <b id="plotTop">—</b><small>now</small>
+        </span>
+        <span class="plot-head arrival" id="plotArrivalHead">
+          <b id="pArrival">—</b><small>on arrival</small>
+        </span>
+      </div>
+      <div class="plot-frame">
+        <svg id="pPlot" viewBox="0 0 360 156" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse"
+                     patternTransform="rotate(-38)">
+              <line x1="0" y1="0" x2="0" y2="7" />
+            </pattern>
+          </defs>
+          <!-- The charge you have promised yourself you will not spend. -->
+          <rect class="plot-reserve" id="plotReserve" x="0" width="360" y="140" height="16" />
+          <line class="plot-reserve-edge" id="plotReserveEdge" x1="0" x2="360" y1="140" y2="140" />
+          <g class="plot-grid" id="plotGrid"></g>
+          <!-- What easing off would buy you. -->
+          <path class="plot-ghost" id="plotGhost" d="" />
+          <!-- Where the charge actually goes. -->
+          <path class="plot-line" id="plotLine" d="" />
+          <line class="plot-dest" id="plotDest" x1="300" x2="300" y1="0" y2="156" />
+          <circle class="plot-dot" id="plotDot" cx="300" cy="60" r="4.5" />
+        </svg>
+      </div>
+      <figcaption class="plot-axis">
+        <span>0 km</span>
+        <span class="plot-ghost-key" id="plotGhostKey"></span>
+        <span id="plotXMax">—</span>
+      </figcaption>
+    </figure>
+
+    <div id="pVerdict" class="verdict">—</div>
+
+    <div class="readout">
+      <div class="stat"><span id="pTimeToEmpty">—</span><label>until 0%</label></div>
+      <div class="stat"><span id="pRange">—</span><label>range km</label></div>
+      <div class="stat"><span id="pWhKm">—</span><label>Wh/km</label></div>
+      <div class="stat"><span id="pDuration">—</span><label>trip time</label></div>
+    </div>
+    <div class="stat-note" id="pEmptyClock"></div>
+
+    <div class="breakdown">
+      <h3 class="sub-head"><span>Where the energy goes</span><i></i><em>Wh/km</em></h3>
+      <div class="breakdown-bar" id="pBar">
+        <div class="seg seg-aero"></div>
+        <div class="seg seg-roll"></div>
+        <div class="seg seg-grade"></div>
+        <div class="seg seg-aux"></div>
+      </div>
+      <ul class="legend">
+        <li><i class="k-aero"></i><span>Air drag</span><b id="lgAero">—</b></li>
+        <li><i class="k-roll"></i><span>Rolling</span><b id="lgRoll">—</b></li>
+        <li><i class="k-grade"></i><span>Climbing</span><b id="lgGrade">—</b></li>
+        <li><i class="k-aux"></i><span>Climate + electronics</span><b id="lgAux">—</b></li>
+      </ul>
+    </div>
+
+    <div id="pAdvice" class="advice"></div>
+
+    <button id="startTrip" class="primary">Start trip &amp; navigate</button>
+    <small class="hint center">
+      Navigation uses your phone's GPS. Keep this screen open — browsers pause
+      location updates when the screen locks.
+    </small>
+  </section>
 
   <!-- ---------------- Vehicle ---------------- -->
   <section class="card">
@@ -252,83 +343,6 @@
         </label>
       </div>
     </details>
-  </section>
-
-  <!-- ---------------- Prediction ---------------- -->
-  <!-- ============================================================
-       The payoff. Two deliberate choices here:
-
-       1. ARRIVAL is the hero, not the countdown. Before setting off the
-          question is "do I make it?", and that is answered by a percentage,
-          not by a duration. The countdown is the right hero once you are
-          moving, so it leads the live screen instead.
-
-       2. The battery track underneath is the whole prediction as one
-          picture: where the charge is now, how much of it this trip eats,
-          what is left, and where the reserve sits. If the solid part ends
-          before the reserve mark, you are short — visible without reading
-          a single number.
-       ============================================================ -->
-  <section class="card result" id="setupResult">
-    <div class="card-head">
-      <h2>Prediction</h2>
-      <span class="card-note" id="pTripNote"></span>
-    </div>
-
-    <div class="arrival">
-      <div class="arrival-figure">
-        <span class="arrival-value" id="pArrival">—</span>
-        <span class="arrival-unit">%</span>
-      </div>
-      <div class="arrival-label">charge left on arrival</div>
-    </div>
-
-    <div class="track" aria-hidden="true">
-      <div class="track-rail">
-        <div class="track-left"  id="pTrackLeft"></div>
-        <div class="track-spend" id="pTrackSpend"></div>
-        <div class="track-reserve-mark" id="pTrackReserve"></div>
-      </div>
-      <div class="track-keys">
-        <span class="track-key left"><i></i><span id="pKeyLeft">—</span></span>
-        <span class="track-key spend"><i></i><span id="pKeySpend">—</span></span>
-        <span class="track-key rsv"><i></i><span id="pKeyReserve">—</span></span>
-      </div>
-    </div>
-
-    <div id="pVerdict" class="verdict">—</div>
-
-    <div class="stat-row">
-      <div class="stat"><span id="pTimeToEmpty">—</span><label>until 0%</label></div>
-      <div class="stat"><span id="pRange">—</span><label>km of range</label></div>
-      <div class="stat"><span id="pWhKm">—</span><label>Wh/km</label></div>
-      <div class="stat"><span id="pDuration">—</span><label>trip time</label></div>
-    </div>
-    <div class="stat-note" id="pEmptyClock"></div>
-
-    <div class="breakdown">
-      <h3 class="sub-head"><span>Where the energy goes</span><i></i><em>Wh/km</em></h3>
-      <div class="breakdown-bar" id="pBar">
-        <div class="seg seg-aero"></div>
-        <div class="seg seg-roll"></div>
-        <div class="seg seg-grade"></div>
-        <div class="seg seg-aux"></div>
-      </div>
-      <ul class="legend">
-        <li><i class="k-aero"></i><span>Air drag</span><b id="lgAero">—</b></li>
-        <li><i class="k-roll"></i><span>Rolling</span><b id="lgRoll">—</b></li>
-        <li><i class="k-grade"></i><span>Climbing</span><b id="lgGrade">—</b></li>
-        <li><i class="k-aux"></i><span>Climate + electronics</span><b id="lgAux">—</b></li>
-      </ul>
-    </div>
-
-    <div id="pAdvice" class="advice"></div>
-
-    <button id="startTrip" class="primary">Start trip &amp; navigate</button>
-    <small class="hint center">
-      Navigation uses your phone's GPS. Keep this screen open — browsers pause
-      location updates when the screen locks.
-    </small>
   </section>
 
   <footer class="disclaimer">

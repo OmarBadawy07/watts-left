@@ -33,9 +33,28 @@ async function set(page, id, value) {
   await page.waitForTimeout(160);
 }
 
+/**
+ * Read the panel, including the plot's real SVG geometry.
+ *
+ * The plot is the headline now, so it has to be tested as a drawing and not
+ * just as the numbers beside it. Everything below is pulled out of the
+ * attributes the renderer actually set, in the SVG's own coordinate space.
+ */
 const readCard = (page) => page.evaluate(() => {
   const t = (id) => document.getElementById(id).textContent.trim();
-  const pct = (id) => parseFloat(document.getElementById(id).style.width) || 0;
+  const num = (id, attr) => parseFloat(document.getElementById(id).getAttribute(attr));
+  const H = 156;
+  const W = 360;
+  const TOP = 7;   // must match PLOT.top in setup-screen.js
+
+  // Where a path ends, in SVG units: "M0 y L x h" -> its second point.
+  const endOf = (id) => {
+    const el = document.getElementById(id);
+    if (el.style.display === 'none') return null;
+    const m = /L\s*([\d.]+)\s+([\d.]+)/.exec(el.getAttribute('d') || '');
+    return m ? { x: +m[1], y: +m[2] } : null;
+  };
+
   return {
     arrival: parseFloat(t('pArrival')),
     range: parseFloat(t('pRange')),
@@ -44,10 +63,22 @@ const readCard = (page) => page.evaluate(() => {
     verdict: document.getElementById('pVerdict').className,
     verdictText: t('pVerdict'),
     result: document.getElementById('setupResult').className,
-    trackLeft: pct('pTrackLeft'),
-    trackSpend: pct('pTrackSpend'),
-    reserveLeft: parseFloat(document.getElementById('pTrackReserve').style.left) || 0,
     climate: [...document.querySelectorAll('#climateSetup [data-cost]')].map((e) => e.textContent.trim()),
+    plot: {
+      W,
+      H,
+      TOP,
+      line: endOf('plotLine'),
+      ghost: endOf('plotGhost'),
+      destX: num('plotDest', 'x1'),
+      dotShown: !document.getElementById('plotDot').classList.contains('hidden'),
+      dotX: num('plotDot', 'cx'),
+      dotY: num('plotDot', 'cy'),
+      reserveY: num('plotReserve', 'y'),
+      reserveShown: document.getElementById('plotReserve').style.display !== 'none',
+      xMax: parseFloat(t('plotXMax')),
+      now: parseFloat(t('plotTop')),
+    },
   };
 });
 
@@ -112,16 +143,40 @@ for (const [label, viewport] of [['mobile', { width: 375, height: 812 }],
       && seen.ok.arrival > seen.tight.arrival && seen.tight.arrival >= seen.bad.arrival,
     seen.ok ? `${seen.ok.arrival} > ${seen.tight.arrival} >= ${seen.bad.arrival}` : 'missing a state');
 
-  // -- 2. The battery track has to agree with the numbers beside it ---------
+  // -- 2. The plot is the headline, so test it as a DRAWING -----------------
+  //
+  // Every one of these converts a pixel back into the quantity it is supposed
+  // to represent and compares it against the figure printed beside it. A plot
+  // whose geometry disagrees with its own labels is worse than no plot.
   await set(page, 'soc', 80);
   await set(page, 'reserve', 15);
   const c = await readCard(page);
-  ok(`${label}-track-matches-arrival`, Math.abs(c.trackLeft - c.arrival) <= 1,
-    `bar ${c.trackLeft.toFixed(1)}% vs figure ${c.arrival}%`);
-  ok(`${label}-track-spend-closes-the-gap`, Math.abs(c.trackLeft + c.trackSpend - 80) <= 1.5,
-    `left ${c.trackLeft.toFixed(1)} + spend ${c.trackSpend.toFixed(1)} vs charge 80%`);
-  ok(`${label}-track-reserve-mark-placed`, Math.abs(c.reserveLeft - 15) < 0.01,
-    `mark at ${c.reserveLeft}% for a 15% reserve`);
+  const { plot } = c;
+  // y is inverted and scaled to the current charge: pct = soc * (1 - y/H).
+  const pctAt = (y) => plot.now * (1 - (y - plot.TOP) / (plot.H - plot.TOP));
+  const kmAt = (x) => (x / plot.W) * plot.xMax;
+
+  ok(`${label}-plot-top-is-current-charge`, plot.now === 80, `${plot.now}%`);
+  ok(`${label}-plot-dot-sits-at-arrival`,
+    plot.dotShown && Math.abs(pctAt(plot.dotY) - c.arrival) <= 1.5,
+    `dot reads ${pctAt(plot.dotY).toFixed(1)}% vs figure ${c.arrival}%`);
+  ok(`${label}-plot-destination-at-trip-distance`, Math.abs(kmAt(plot.destX) - 150) <= 4,
+    `rule at ${kmAt(plot.destX).toFixed(0)} km for a 150 km trip`);
+  ok(`${label}-plot-dot-on-the-destination-rule`, Math.abs(plot.dotX - plot.destX) < 0.6,
+    `dot x ${plot.dotX} vs rule x ${plot.destX}`);
+  ok(`${label}-plot-line-ends-where-range-does`,
+    plot.line && Math.abs(kmAt(plot.line.x) - c.range) <= 6,
+    plot.line ? `line ends at ${kmAt(plot.line.x).toFixed(0)} km vs range ${c.range} km` : 'no line');
+  ok(`${label}-plot-line-ends-at-zero-charge`, plot.line && Math.abs(plot.line.y - plot.H) < 0.6,
+    plot.line ? `y=${plot.line.y} of ${plot.H}` : 'no line');
+  ok(`${label}-plot-reserve-band-at-reserve`,
+    plot.reserveShown && Math.abs(pctAt(plot.reserveY) - 15) <= 0.5,
+    `band top reads ${pctAt(plot.reserveY).toFixed(1)}% for a 15% reserve`);
+  // The counterfactual must go FURTHER, or it is not a counterfactual.
+  ok(`${label}-plot-ghost-outlasts-the-real-line`,
+    !plot.ghost || plot.ghost.x > plot.line.x,
+    plot.ghost ? `ghost ${kmAt(plot.ghost.x).toFixed(0)} km vs line ${kmAt(plot.line.x).toFixed(0)} km`
+      : 'no ghost drawn');
   await set(page, 'reserve', 10);
 
   // -- 3. Range and arrival must tell the same story ------------------------

@@ -5,68 +5,104 @@
    ======================================================================== */
 
 /* ===========================================================================
-   DESIGN TOKENS
+   DESIGN TOKENS — a night instrument, not a dark theme
 
-   The previous palette was a navy-black under a neon spring green. That exact
-   pairing is the house style of every generated dark interface, which is
-   precisely why the app read as though nobody had looked at it. Two decisions
-   replace it:
+   This app is read in a car, after dark, usually at the moment you have
+   started to worry about making it. Three decisions follow from that, and
+   everything else in the stylesheet follows from these three.
 
-     1. The surfaces are NEUTRAL ink, not blue-black. Neutral surfaces let a
-        colour mean something when it appears; a blue-tinted surface makes
-        everything on it look tinted too.
+   1. THE GROUND IS WARM.
+      Instrument lighting in a car is amber and deliberately low in blue,
+      because blue light is what destroys your dark adaptation. So the ground
+      here has brown in it rather than the blue-black that every dark-mode
+      interface reaches for, and the illumination is amber.
 
-     2. Colour is reserved for STATE. The primary action is near-white, not
-        green — so green, amber and red are free to mean exactly one thing
-        each, and the eye learns that a colour on this screen is information.
+   2. NOTHING GLOWS TO SAY YOU ARE FINE.
+      A real instrument panel lights up when something needs you and stays
+      dark when it does not — there is no green lamp for "the engine is
+      working". So "you make it" is simply bone white, unlit. Amber means you
+      are into the reserve you promised yourself. Red means you do not get
+      there. Colour on this screen is always an exception.
+
+      The previous palette painted the happy state a bright green, which is
+      both the convention and the reason the app looked like every other dark
+      app: a near-black ground under one saturated accent.
+
+   3. THE TYPE IS DIN.
+      The road-sign and engineering standard, and the native lettering of this
+      subject. It ships on every platform this app runs on under a different
+      name, so it costs nothing and works offline: Bahnschrift on Windows,
+      DIN Alternate on iOS, Roboto Condensed on Android. Condensed numerals
+      are also the functionally correct choice — more digits, larger, in the
+      same width, which is the constraint every instrument cluster has.
    ======================================================================== */
+
 :root {
-  /* ---- Surfaces --------------------------------------------------------- */
-  --bg:        #0a0b0d;
-  --bg-card:   #121417;
-  --bg-raise:  #1a1d21;
-  --bg-input:  #0e1013;
-  --line:      #24282e;
-  --line-soft: #272c33;
+  /* ---- Ground ----------------------------------------------------------- */
+  --ink:      #14110d;   /* the binnacle */
+  --panel:    #1e1a15;   /* an instrument face */
+  --panel-2:  #2a241c;   /* raised control */
+  --well:     #100e0a;   /* inset: inputs, tracks */
+  --rule:     #392f24;
+  --rule-2:   #292219;
 
-  --text:      #f2f4f6;
-  --text-dim:  #99a1aa;
-  /* 4.6:1 on the card surface. An earlier value looked pleasantly recessive
-     in a mock-up and was unreadable at 11px on a phone in daylight — quiet is
-     a tone, not an excuse to go under the contrast floor. */
-  --text-mute: #858d96;
+  /* ---- Illumination ----------------------------------------------------- */
+  --bone:      #f4ecdc;  /* primary readouts */
+  --bone-dim:  #b0a591;  /* secondary text */
+  --bone-mute: #8d8271;  /* labels, captions */
 
-  /* ---- State -----------------------------------------------------------
-     Green and amber are a pair that protanopes and deuteranopes cannot
-     reliably separate — measured CVD ΔE 6.7, inside the warn band. They are
-     kept because they are the conventional reading of "fine" and "careful",
-     and every use of them carries an ICON AND WORDS as well, so the colour is
-     confirmation rather than the message. */
-  --ok:         #35c97b;
-  --warn:       #f0a93b;
-  --danger:     #ff6a5e;
-  --ok-dim:     rgba(53,201,123,.13);
-  --warn-dim:   rgba(240,169,59,.13);
-  --danger-dim: rgba(255,106,94,.13);
-  --accent:     #35c97b;
-  --accent-dk:  #23a962;
+  --amber:     #ffae1a;  /* the instrument lamp: live, selected, caution */
+  --amber-dim: rgba(255,174,26,.14);
+  --alarm:     #ff5646;  /* reserved: you do not get there */
+  --alarm-dim: rgba(255,86,70,.15);
 
-  /* ---- Energy breakdown ------------------------------------------------
+  /* Aliases kept so the map and search modules, which speak in these names,
+     do not need rewriting to follow the palette. */
+  --bg:        var(--ink);
+  --bg-card:   var(--panel);
+  --bg-raise:  var(--panel-2);
+  --bg-input:  var(--well);
+  --line:      var(--rule);
+  --line-soft: var(--rule-2);
+  --text:      var(--bone);
+  --text-dim:  var(--bone-dim);
+  --text-mute: var(--bone-mute);
+  --ok:        var(--bone);
+  --warn:      var(--amber);
+  --danger:    var(--alarm);
+  --ok-dim:    rgba(244,236,220,.08);
+  --warn-dim:  var(--amber-dim);
+  --danger-dim: var(--alarm-dim);
+  --accent:    var(--amber);
+  --accent-dk: #d68f0f;
+
+  /* ---- Energy breakdown -------------------------------------------------
      Four categories in one stacked bar, so ADJACENT separation is what
-     matters. Validated against the card surface: worst adjacent pair ΔE 17.3
-     for colour-vision deficiency and 24.6 for normal vision, every slot above
-     3:1 contrast, all four inside the dark-surface lightness band. */
-  --k-aero:  #3987e5;
-  --k-roll:  #d95926;
-  --k-grade: #9085e9;
-  --k-aux:   #199e70;
+     matters. Re-stepped for the warm ground and revalidated: every slot
+     inside the dark lightness band, above the chroma floor, above 3:1
+     contrast, worst adjacent pair well clear of both CVD and normal-vision
+     floors. The amber is deliberately NOT among them — that hue belongs to
+     the instrument lamp and must not turn up as a data category. */
+  --k-aero:  #4d90e0;
+  --k-roll:  #e2673a;
+  --k-grade: #9080e0;
+  --k-aux:   #23a173;
+
+  /* ---- Type -------------------------------------------------------------
+     Two roles, and the split is strict. The data face carries every number,
+     label, heading and control — anything you read at a glance. The text
+     face carries prose, because condensed type is not what you want for a
+     sentence you actually have to read. */
+  --face-data: Bahnschrift, "DIN Alternate", "DIN Condensed", "Roboto Condensed",
+               "Avenir Next Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  --face-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* ---- Geometry ---------------------------------------------------------
-     A radius SCALE, not one value everywhere. Nesting a 10px corner inside a
-     16px one is what makes a stack of boxes look drawn rather than defaulted. */
-  --radius:    16px;
-  --radius-md: 12px;
-  --radius-sm: 9px;
+     Instruments are not pill-shaped. The radius drops to something closer to
+     a machined bezel than a rounded card, and steps rather than repeating. */
+  --radius:    10px;
+  --radius-md: 7px;
+  --radius-sm: 5px;
 
   --ease: cubic-bezier(.4, 0, .2, 1);
 }
@@ -78,7 +114,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--face-text);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -93,92 +129,81 @@ body {
 .screen.active { display: block; }
 
 /* ---- Header --------------------------------------------------------------
-   The wordmark was gradient-filled text, which is the single loudest tell of
-   an interface nobody drew. It is now plain type at a real weight with tight
-   tracking, beside a mark that says what the app is: a battery with a bolt. */
-.app-header { padding: 22px 2px 12px; }
-.wordmark { display: flex; align-items: center; gap: 11px; }
+   The mark is a battery cell with a bolt, drawn in the same stroke weight as
+   the interface icons so it belongs to them rather than sitting on top. The
+   wordmark is set in the data face at a width that matches it. */
+.app-header { padding: 20px 2px 6px; }
+.wordmark { display: flex; align-items: center; gap: 10px; }
 .wordmark-mark {
-  width: 27px; height: 27px; flex: none;
-  fill: none; stroke: var(--text); stroke-width: 1.7; stroke-linejoin: round;
+  width: 25px; height: 25px; flex: none;
+  fill: none; stroke: var(--bone); stroke-width: 1.7; stroke-linejoin: round;
 }
-.wordmark-mark .bolt { fill: var(--ok); stroke: var(--ok); stroke-width: 1.1; }
+.wordmark-mark .bolt { fill: var(--amber); stroke: var(--amber); stroke-width: 1.1; }
 .app-header h1 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 750;
-  letter-spacing: -.038em;
-  color: var(--text);
+  font: 700 25px/1 var(--face-data);
+  letter-spacing: .005em;
+  text-transform: uppercase;
+  color: var(--bone);
 }
 .tagline {
-  margin: 9px 0 0 38px;
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1.45;
+  margin: 9px 0 0 35px;
+  font: 400 12.5px/1.45 var(--face-text);
+  color: var(--bone-mute);
   max-width: 32ch;
 }
 
 /* ---- Cards ---------------------------------------------------------------
-   Section headings used to be uppercase tracked-out labels floating above the
-   content — legible, but the default. The label now anchors a hairline that
-   runs to the card edge, which gives every section a horizon line and makes
-   the stack read as a document rather than a pile of boxes. */
+   Quieter than the panel above them, and deliberately so: these are the
+   controls, not the answer. Flat, hairline-bordered, no lift. */
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--line);
+  background: var(--panel);
+  border: 1px solid var(--rule-2);
   border-radius: var(--radius);
-  padding: 17px 16px;
-  margin: 12px 0;
+  padding: 15px;
+  margin: 11px 0;
 }
-.card.compact { padding: 14px; margin: 10px 0; }
+.card.compact { padding: 13px; margin: 9px 0; }
 .card h2 {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin: 0 0 15px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: .09em;
+  gap: 10px;
+  margin: 0 0 14px;
+  font: 600 11px/1 var(--face-data);
+  letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--bone-mute);
   white-space: nowrap;
 }
-.card h2::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line-soft);
-}
-.card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+.card h2::after { content: ''; flex: 1; height: 1px; background: var(--rule-2); }
+.card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .card-head h2 { flex: 1; margin: 0; min-width: 0; }
 .card-note {
   flex: none;
-  font-size: 11.5px;
-  color: var(--text-mute);
+  font: 500 11px/1 var(--face-data);
+  letter-spacing: .04em;
+  color: var(--bone-mute);
   font-variant-numeric: tabular-nums;
 }
 .card-note:empty { display: none; }
-.card h3 { margin: 0 0 6px; font-size: 15px; }
-/* The unit lives here, once, instead of on all four legend rows — where it
-   was pure repetition and squeezed "Climate + electronics" into an ellipsis. */
+.card h3 { margin: 0 0 6px; font: 600 14.5px/1.2 var(--face-data); }
 .sub-head {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin: 0 0 11px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: .09em;
+  gap: 10px;
+  margin: 0 0 10px;
+  font: 600 10.5px/1 var(--face-data);
+  letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--bone-mute);
   white-space: nowrap;
 }
-.sub-head i { flex: 1; height: 1px; background: var(--line-soft); }
+.sub-head i { flex: 1; height: 1px; background: var(--rule-2); }
 .sub-head em {
   font-style: normal;
   text-transform: none;   /* a unit is written Wh/km, never WH/KM */
-  letter-spacing: 0;
-  font-size: 12px;
+  letter-spacing: .02em;
+  font-size: 11px;
 }
 
 /* ---- Form fields --------------------------------------------------------- */
@@ -199,10 +224,10 @@ body {
    nothing in particular — and left the colour with nothing to say when it
    appeared on something that did. */
 output {
-  color: var(--text);
+  font: 700 14px/1 var(--face-data);
+  letter-spacing: .01em;
+  color: var(--bone);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  letter-spacing: -.02em;
 }
 
 input[type="number"], select {
@@ -241,7 +266,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 input[type="range"]::-webkit-slider-thumb {
   appearance: none; width: 26px; height: 26px; margin-top: -11px;
-  border-radius: 50%; background: var(--text); border: 3px solid var(--bg-card);
+  border-radius: 50%; background: var(--amber); border: 3px solid var(--panel);
   box-shadow: 0 2px 8px rgba(0,0,0,.5);
 }
 input[type="range"]::-moz-range-track {
@@ -249,11 +274,16 @@ input[type="range"]::-moz-range-track {
 }
 input[type="range"]::-moz-range-thumb {
   width: 22px; height: 22px; border-radius: 50%;
-  background: var(--text); border: 3px solid var(--bg-card);
+  background: var(--amber); border: 3px solid var(--panel);
 }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.hint { display: block; color: var(--text-dim); font-size: 12.5px; line-height: 1.45; margin-top: 6px; }
+.hint {
+  display: block;
+  margin-top: 6px;
+  font: 400 12px/1.45 var(--face-text);
+  color: var(--bone-mute);
+}
 .hint.center { text-align: center; }
 
 .check { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-top: 10px; }
@@ -281,9 +311,9 @@ input[type="range"]::-moz-range-thumb {
 .segmented button {
   min-height: 44px;
   padding: 12px 4px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-dim);
+  font: 600 13.5px/1 var(--face-data);
+  letter-spacing: .04em;
+  color: var(--bone-dim);
   background: transparent;
   border: 0;
   border-radius: var(--radius-sm);
@@ -295,9 +325,9 @@ input[type="range"]::-moz-range-thumb {
    button and with the white slider thumbs; three different things claiming to
    be the loudest element is how a screen loses its hierarchy. */
 .segmented button.on {
-  background: var(--bg-raise);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px #39414a, 0 1px 3px rgba(0,0,0,.45);
+  background: var(--amber-dim);
+  color: var(--amber);
+  box-shadow: inset 0 0 0 1px rgba(255,174,26,.42);
 }
 
 /* The climate control carries a price on every option, not just the chosen
@@ -312,37 +342,47 @@ input[type="range"]::-moz-range-thumb {
   padding: 9px 2px 8px;
   line-height: 1.1;
 }
-.segmented.costed b { font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
+.segmented.costed b { font: 600 13px/1 var(--face-data); letter-spacing: .04em; }
 .segmented.costed em {
+  font: 600 11px/1 var(--face-data);
   font-style: normal;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: -.015em;
-  color: var(--text-mute);
+  letter-spacing: .02em;
+  color: var(--bone-mute);
   font-variant-numeric: tabular-nums;
 }
-.segmented.costed button.on em { color: var(--text-dim); }
+.segmented.costed button.on em { color: var(--amber); opacity: .8; }
 
 /* ---- Buttons -------------------------------------------------------------
    The primary action is near-white rather than green. In an app whose job is
    telling you whether you are safe, a green button competes with a green
    verdict for the same meaning — so the button gives the colour up. */
 button.primary {
+  display: block;
   width: 100%;
   margin-top: 18px;
-  padding: 17px;
-  font-size: 16.5px;
-  font-weight: 700;
-  letter-spacing: -.015em;
-  color: #0a0b0d;
-  background: var(--text);
+  padding: 16px;
+  font: 700 15.5px/1 var(--face-data);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #17120a;
+  background: var(--amber);
   border: 0;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: transform .12s var(--ease), background .15s var(--ease);
 }
-button.primary:hover { background: #ffffff; }
-button.primary:active { background: #d6dade; transform: scale(.988); }
+button.primary:hover { background: #ffbe45; }
+button.primary:active { background: var(--accent-dk); transform: scale(.988); }
+/* The compact primary sits beside another button in a split row, so it gets
+   a tighter setting — at the full uppercase tracking "Start navigation" broke
+   across two lines in half the width. */
+button.primary.compact {
+  margin-top: 0;
+  padding: 14px 12px;
+  font-size: 13.5px;
+  letter-spacing: .05em;
+}
+
 button.secondary {
   padding: 12px 20px;
   font-size: 15px;
@@ -353,7 +393,7 @@ button.secondary {
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-button.secondary:hover { border-color: #333941; }
+button.secondary:hover { border-color: #453a2c; }
 button.ghost {
   padding: 8px 12px;
   font-size: 15px;
@@ -364,158 +404,183 @@ button.ghost {
 }
 
 /* ===========================================================================
-   THE PREDICTION PANEL
+   THE INSTRUMENT PANEL
    ======================================================================== */
 
-/* The payoff card is the only surface in the app with any lift to it. The
-   glow at its top takes its hue from the verdict, so the card is tinted by
-   the answer before you have read a word of it. */
-.result {
+.panel {
   position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(120% 58% at 50% 0%, rgba(53,201,123,.085), transparent 72%),
-    var(--bg-card);
+  margin: 14px 0 22px;
+  padding: 0 15px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  /* The lamp behind the glass. It is warm and it comes from the top, the way
+     a binnacle is lit — not a coloured halo behind a card. */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.045),
-    0 22px 46px -30px rgba(0,0,0,.95);
-}
-.result.tight {
-  background:
-    radial-gradient(120% 58% at 50% 0%, rgba(240,169,59,.085), transparent 72%),
-    var(--bg-card);
-}
-.result.bad {
-  background:
-    radial-gradient(120% 58% at 50% 0%, rgba(255,106,94,.095), transparent 72%),
-    var(--bg-card);
+    inset 0 60px 90px -70px rgba(255,174,26,.22),
+    inset 0 1px 0 rgba(255,236,205,.05),
+    0 24px 48px -34px #000;
 }
 
-.result::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--ok) 22%, var(--ok) 78%, transparent);
-  opacity: .85;
-}
-.result.tight::before { background: linear-gradient(90deg, transparent, var(--warn) 22%, var(--warn) 78%, transparent); }
-.result.bad::before   { background: linear-gradient(90deg, transparent, var(--danger) 22%, var(--danger) 78%, transparent); }
 
-/* ---- Arrival: the hero ---------------------------------------------------
-   Before you set off the question is "do I make it?", and the answer to that
-   is a percentage, not a duration. The countdown that used to sit here has
-   moved into the stat row, and leads the LIVE screen instead — where the
-   question really has become "how long have I got?". */
-.arrival { text-align: center; padding: 6px 0 2px; }
-.arrival-figure { display: flex; align-items: baseline; justify-content: center; gap: 1px; }
-.arrival-value {
-  font-size: clamp(56px, 18vw, 72px);
-  font-weight: 800;
-  line-height: .92;
-  letter-spacing: -.05em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ok);
-}
-.arrival-unit {
-  font-size: 25px;
-  font-weight: 700;
-  letter-spacing: -.03em;
-  color: var(--text-dim);
-}
-.arrival-label { margin-top: 12px; font-size: 12.5px; color: var(--text-dim); }
-.result.tight .arrival-value { color: var(--warn); }
-.result.bad   .arrival-value { color: var(--danger); }
-
-/* ---- The battery track ---------------------------------------------------
-   The whole prediction as one picture. Left to right is 100% down to 0%, so
-   it drains the way a gauge does: the solid part is what you arrive with, the
-   hatched part is what this trip eats, and the notch is your reserve. A solid
-   part ending before the notch means you are under it — readable without
-   taking in a single number.
-
-   The hatching is not decoration. It is the secondary encoding that keeps the
-   two bands distinct for a colourblind reader, in print, and in forced
-   colours, where the fills alone would not be enough. */
-.track { margin: 18px 0 2px; }
-.track-rail {
-  position: relative;
-  height: 13px;
-  border-radius: 999px;
-  background: var(--bg-input);
-  box-shadow: inset 0 0 0 1px var(--line);
-  overflow: hidden;
-}
-.track-left, .track-spend {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  transition: width .35s var(--ease), left .35s var(--ease);
-}
-.track-left { left: 0; background: var(--ok); }
-.result.tight .track-left { background: var(--warn); }
-.result.bad   .track-left { background: var(--danger); }
-.track-spend {
-  background:
-    repeating-linear-gradient(116deg,
-      rgba(255,255,255,.19) 0 3px, rgba(255,255,255,0) 3px 7px),
-    #2b3138;
-  /* The 2px gap between adjacent fills, cut in the card's own colour. */
-  border-left: 2px solid var(--bg-card);
-}
-.track-reserve-mark {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--text);
-  opacity: .82;
-  box-shadow: 0 0 0 1.5px rgba(10,11,13,.75);
-}
-.track-keys {
+/* The rail: a label, a hairline, and the trip it belongs to. This is the
+   panel's only chrome, and it exists to say what you are looking at. */
+.panel-rail {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-top: 11px;
-  font-size: 11.5px;
-  color: var(--text-dim);
+  align-items: center;
+  gap: 11px;
+  margin: 0 -15px;
+  padding: 13px 15px 12px;
+  border-bottom: 1px solid var(--rule-2);
+}
+.panel-eyebrow {
+  font: 600 11px/1 var(--face-data);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  white-space: nowrap;
+}
+.panel-rail::after { content: ''; flex: 1; height: 1px; background: var(--rule-2); order: 1; }
+.panel-trip {
+  order: 2;
+  font: 500 11.5px/1 var(--face-data);
+  letter-spacing: .04em;
+  color: var(--bone-mute);
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.track-key { display: inline-flex; align-items: center; gap: 7px; }
-.track-key i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-.track-key.left i { background: var(--ok); }
-.result.tight .track-key.left i { background: var(--warn); }
-.result.bad   .track-key.left i { background: var(--danger); }
-.track-key.spend i {
-  background:
-    repeating-linear-gradient(116deg,
-      rgba(255,255,255,.4) 0 2px, rgba(255,255,255,0) 2px 4px),
-    #2b3138;
+
+/* ---- The descent plot ----------------------------------------------------
+   The signature. Charge on the vertical, distance on the horizontal, so the
+   line falls the way the battery does. What it shows that a percentage
+   cannot: the RATE, where you cross into your reserve, and — as a second,
+   dimmer line — what easing off would buy you.
+
+   It is drawn with no fill under the curve and no gradient. A plot on an
+   instrument is ink on a face; the moment it gets a soft coloured wash it
+   stops looking measured and starts looking decorative. */
+.plot { margin: 0 -15px; padding: 18px 15px 0; }
+.plot-frame { position: relative; }
+#pPlot {
+  display: block;
+  width: 100%;
+  height: 156px;
+  overflow: visible;
 }
-.track-key.rsv i {
-  width: 2px; height: 12px; border-radius: 1px;
-  background: var(--text); opacity: .82;
+#pPlot line, #pPlot path, #pPlot circle, #pPlot rect { vector-effect: non-scaling-stroke; }
+
+/* The reserve: charge you have already promised yourself you will not spend,
+   hatched rather than filled so it reads as out of bounds. */
+.plot-reserve { fill: url(#hatch); stroke: none; opacity: .5; }
+#hatch line { stroke: var(--bone-mute); stroke-width: 1; }
+.plot-reserve-edge { stroke: var(--bone-mute); stroke-width: 1; stroke-dasharray: 1 4; opacity: .8; }
+
+.plot-grid line { stroke: var(--rule-2); stroke-width: 1; }
+
+.plot-line {
+  fill: none;
+  stroke: var(--bone);
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
+.panel.tight .plot-line { stroke: var(--amber); }
+.panel.bad   .plot-line { stroke: var(--alarm); }
+
+/* The counterfactual. Dashed and dim: it is not what is happening. */
+.plot-ghost {
+  fill: none;
+  stroke: var(--bone-mute);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  opacity: .75;
+}
+
+.plot-dest { stroke: var(--amber); stroke-width: 1.5; opacity: .75; }
+.plot-dot {
+  fill: var(--bone);
+  stroke: var(--panel);
+  stroke-width: 3;
+}
+.panel.tight .plot-dot { fill: var(--amber); }
+.panel.bad   .plot-dot { fill: var(--alarm); }
+.plot-dot.hidden { display: none !important; }
+
+/* The two readouts sit in their own strip ABOVE the plot.
+   They were inside it, and there is no safe place in there: the line sweeps
+   corner to corner, so any spot that is clear at one charge level is under
+   the curve at another. The arrival figure is still positioned at the
+   destination's x, so it points at the rule below it without ever touching
+   the line. */
+.plot-heads { position: relative; height: 40px; margin-bottom: 2px; }
+.plot-head {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.plot-head b {
+  font: 700 15px/1 var(--face-data);
+  letter-spacing: .01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--bone-dim);
+}
+.plot-head small {
+  font: 500 9px/1 var(--face-data);
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--bone-mute);
+}
+.plot-head.now { left: 0; }
+.plot-head.arrival { align-items: center; transform: translateX(-50%); }
+.plot-head.arrival b { font-size: 27px; color: var(--bone); }
+.panel.tight .plot-head.arrival b { color: var(--amber); }
+.panel.bad   .plot-head.arrival b { color: var(--alarm); }
+.plot-head.arrival.edge-right { align-items: flex-end; transform: translateX(-100%); }
+
+.plot-axis {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 9px 0 0;
+  font: 500 11px/1 var(--face-data);
+  letter-spacing: .05em;
+  color: var(--bone-mute);
+  font-variant-numeric: tabular-nums;
+}
+.plot-ghost-key { display: inline-flex; align-items: center; gap: 6px; text-align: center; }
+.plot-ghost-key::before {
+  content: '';
+  width: 16px;
+  height: 0;
+  border-top: 1.5px dashed var(--bone-mute);
+  flex: none;
+}
+.plot-ghost-key:empty { display: none; }
 
 /* ---- Verdict -------------------------------------------------------------
-   Always an icon AND words, never colour alone: the green and the amber here
-   are a pair that red-green colourblind readers cannot separate. */
+   Icon and words always, never colour alone — and here the "you make it"
+   state carries no colour at all, so the words are doing the whole job. */
 .verdict {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 9px;
   margin: 16px 0 0;
-  padding: 13px 14px;
+  padding: 11px 12px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
-  line-height: 1.45;
+  font: 400 13.5px/1.45 var(--face-text);
   border: 1px solid transparent;
 }
 .verdict > span { min-width: 0; }
 .verdict::before {
   content: '';
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   margin-top: 1px;
   flex: none;
   background: currentColor;
@@ -523,88 +588,100 @@ button.ghost {
   -webkit-mask-position: center;  mask-position: center;
   -webkit-mask-size: 100% 100%;   mask-size: 100% 100%;
 }
-.verdict.big { font-size: 15.5px; padding: 14px; margin: 12px 0; }
+.verdict.big { font-size: 15px; padding: 13px; margin: 12px 0; }
 .verdict.ok {
-  background: var(--ok-dim); color: var(--ok);
-  border-color: rgba(53,201,123,.28);
+  background: rgba(244,236,220,.045);
+  color: var(--bone-dim);
+  border-color: var(--rule);
 }
-.verdict.tight {
-  background: var(--warn-dim); color: var(--warn);
-  border-color: rgba(240,169,59,.28);
-}
-.verdict.bad {
-  background: var(--danger-dim); color: var(--danger);
-  border-color: rgba(255,106,94,.32);
-}
+.verdict.ok strong { color: var(--bone); }
+.verdict.tight { background: var(--amber-dim); color: var(--amber); border-color: rgba(255,174,26,.3); }
+.verdict.bad   { background: var(--alarm-dim); color: var(--alarm); border-color: rgba(255,86,70,.34); }
 .verdict.ok::before {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6.5 9.2 17.3 4 12.1'/%3E%3C/svg%3E");
           mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6.5 9.2 17.3 4 12.1'/%3E%3C/svg%3E");
 }
 .verdict.tight::before {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2 1.6 20.8h20.8z'/%3E%3Cpath d='M12 9.4v4.4'/%3E%3Cpath d='M12 17.4h.01'/%3E%3C/svg%3E");
-          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2 1.6 20.8h20.8z'/%3E%3Cpath d='M12 9.4v4.4'/%3E%3Cpath d='M12 17.4h.01'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2 1.6 20.8h20.4z'/%3E%3Cpath d='M12 9.4v4.4'/%3E%3Cpath d='M12 17.4h.01'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2 1.6 20.8h20.4z'/%3E%3Cpath d='M12 9.4v4.4'/%3E%3Cpath d='M12 17.4h.01'/%3E%3C/svg%3E");
 }
 .verdict.bad::before {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9.2'/%3E%3Cpath d='M15.2 8.8 8.8 15.2M8.8 8.8l6.4 6.4'/%3E%3C/svg%3E");
           mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9.2'/%3E%3Cpath d='M15.2 8.8 8.8 15.2M8.8 8.8l6.4 6.4'/%3E%3C/svg%3E");
 }
 
-/* ---- Stat row ------------------------------------------------------------
-   Left-aligned under hairline rules rather than centred in a row of equal
-   boxes. Centred numbers of different widths never line up with anything;
-   left-aligned ones share an edge, which is what makes a set of figures read
-   as measured rather than arranged. */
-.stat-row {
+/* ---- Readout row ---------------------------------------------------------
+   Five figures under one rule, divided by hairlines. Deliberately NOT four
+   equal boxes: this is a strip of gauges, and gauges sit in a row sharing a
+   baseline, not in cards. */
+.readout {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  margin-top: 18px;
-  padding-top: 15px;
-  border-top: 1px solid var(--line-soft);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 0;
+  margin-top: 17px;
+  padding-top: 13px;
+  border-top: 1px solid var(--rule-2);
 }
-.stat { position: relative; padding-right: 8px; }
-.stat + .stat { padding-left: 12px; }
+.stat { position: relative; padding-right: 5px; min-width: 0; }
+.stat + .stat { padding-left: 8px; }
 .stat + .stat::before {
   content: '';
   position: absolute;
   left: 0; top: 1px; bottom: 3px;
   width: 1px;
-  background: var(--line-soft);
+  background: var(--rule-2);
 }
+/* In the two-column layout the divider belongs between the pair, not before
+   every cell — cells 1 and 3 start a row and must not carry a left rule. */
+.readout > .stat:nth-child(odd) { padding-left: 0; }
+.readout > .stat:nth-child(odd)::before { display: none; }
+
+@media (min-width: 420px) {
+  .readout { grid-template-columns: repeat(4, 1fr); gap: 0; }
+  .readout > .stat:nth-child(odd) { padding-left: 8px; }
+  .readout > .stat:nth-child(odd)::before { display: block; }
+  .readout > .stat:first-child { padding-left: 0; }
+  .readout > .stat:first-child::before { display: none; }
+  .stat span { font-size: 18px; }
+}
+/* nowrap on both lines: at 375px a four-column strip has about 64px per
+   figure, and "2h 46m" breaking across two lines turned a readout into a
+   paragraph. */
 .stat span {
   display: block;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -.03em;
+  font: 700 17px/1 var(--face-data);
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+  color: var(--bone);
+  white-space: nowrap;
 }
 .stat label {
   display: block;
-  margin-top: 4px;
-  font-size: 10.5px;
-  line-height: 1.3;
-  color: var(--text-mute);
+  margin-top: 5px;
+  font: 500 9px/1.25 var(--face-data);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--bone-mute);
+  white-space: nowrap;
 }
 .stat-note {
-  margin-top: 12px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--text-mute);
+  margin-top: 11px;
+  font: 400 11.5px/1.45 var(--face-text);
+  color: var(--bone-mute);
 }
 .stat-note:empty { display: none; }
 
 /* ---- Energy breakdown ---------------------------------------------------- */
-.breakdown { margin-top: 22px; }
+.breakdown { margin-top: 20px; }
 .breakdown-bar {
   display: flex;
   gap: 2px;                     /* the surface gap between stacked segments */
-  height: 11px;
-  border-radius: 999px;
-  background: var(--bg-input);
+  height: 9px;
+  border-radius: 2px;
+  background: var(--well);
   overflow: hidden;
 }
-.seg { height: 100%; border-radius: 2px; transition: width .3s var(--ease); }
-.seg:first-child { border-radius: 999px 2px 2px 999px; }
-.seg:last-child  { border-radius: 2px 999px 999px 2px; }
+.seg { height: 100%; transition: width .3s var(--ease); }
 .seg-aero  { background: var(--k-aero); }
 .seg-roll  { background: var(--k-roll); }
 .seg-grade { background: var(--k-grade); }
@@ -612,21 +689,21 @@ button.ghost {
 
 .legend {
   list-style: none;
-  margin: 13px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 9px 18px;
-  font-size: 12.5px;
-  color: var(--text-dim);
+  gap: 8px 18px;
+  font: 400 12px/1.2 var(--face-text);
+  color: var(--bone-dim);
 }
 .legend li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .legend li > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.legend i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.legend i { width: 8px; height: 8px; border-radius: 1px; flex: none; }
 .legend b {
   margin-left: auto;
-  color: var(--text);
-  font-weight: 650;
+  color: var(--bone);
+  font: 700 12.5px/1 var(--face-data);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -635,17 +712,14 @@ button.ghost {
 
 /* ---- Advice -------------------------------------------------------------- */
 .advice {
-  margin-top: 18px;
-  padding: 12px 15px;
-  border-left: 2px solid #363d45;
-  background: rgba(255,255,255,.022);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--text-dim);
+  margin-top: 16px;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--rule-2);
+  font: 400 13px/1.55 var(--face-text);
+  color: var(--bone-dim);
 }
 .advice:empty { display: none; }
-.advice strong { color: var(--text); font-weight: 650; }
+.advice strong { color: var(--bone); font-weight: 600; }
 
 /* ---- Live screen --------------------------------------------------------- */
 .live-header {
@@ -663,36 +737,34 @@ button.ghost {
 .hero {
   text-align: center;
   padding: 26px 16px 24px;
-  background:
-    radial-gradient(125% 96% at 50% 0%, rgba(53,201,123,.1), transparent 66%),
-    var(--bg-card);
-  border: 1px solid var(--line);
+  background: var(--panel);
+  border: 1px solid var(--rule);
   border-radius: var(--radius);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.045);
+  box-shadow:
+    inset 0 52px 80px -66px rgba(255,174,26,.2),
+    inset 0 1px 0 rgba(255,236,205,.05);
 }
 .hero-label {
-  font-size: 11.5px;
-  letter-spacing: .09em;
+  font: 600 11px/1 var(--face-data);
+  letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--bone-mute);
 }
 .hero-value {
-  margin: 9px 0 4px;
-  font-size: 56px;
-  font-weight: 800;
-  line-height: .95;
-  letter-spacing: -.05em;
+  margin: 10px 0 5px;
+  font: 700 58px/0.95 var(--face-data);
+  letter-spacing: .005em;
   font-variant-numeric: tabular-nums;
-  color: var(--ok);
+  color: var(--bone);
 }
-.hero-clock { font-size: 13px; color: var(--text-mute); }
+.hero-clock { font: 500 12.5px/1 var(--face-data); letter-spacing: .04em; color: var(--bone-mute); }
 .hero.warn .hero-value { color: var(--warn); }
 .hero.bad  .hero-value { color: var(--danger); }
-.hero.warn { background: radial-gradient(125% 96% at 50% 0%, rgba(240,169,59,.1), transparent 66%), var(--bg-card); }
-.hero.bad  { background: radial-gradient(125% 96% at 50% 0%, rgba(255,106,94,.11), transparent 66%), var(--bg-card); }
+.hero.warn { box-shadow: inset 0 52px 80px -60px rgba(255,174,26,.34), inset 0 1px 0 rgba(255,236,205,.05); }
+.hero.bad  { box-shadow: inset 0 52px 80px -60px rgba(255,86,70,.34), inset 0 1px 0 rgba(255,236,205,.05); }
 /* Paused is not a countdown, so it does not get a countdown's colour. */
-.hero.paused .hero-value { color: var(--text); }
-.hero.paused { background: var(--bg-card); }
+.hero.paused .hero-value { color: var(--bone-dim); }
+.hero.paused { box-shadow: inset 0 1px 0 rgba(255,236,205,.04); }
 
 .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
 .tile {
@@ -704,12 +776,19 @@ button.ghost {
 }
 .tile-value {
   display: block;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -.035em;
+  font: 700 23px/1 var(--face-data);
+  letter-spacing: .005em;
   font-variant-numeric: tabular-nums;
+  color: var(--bone);
 }
-.tile label { display: block; margin-top: 4px; font-size: 10.5px; color: var(--text-mute); }
+.tile label {
+  display: block;
+  margin-top: 5px;
+  font: 500 9.5px/1.2 var(--face-data);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--bone-mute);
+}
 
 .calibrate-row { display: flex; gap: 9px; margin-top: 10px; }
 .calibrate-row input { flex: 1; }
@@ -741,8 +820,8 @@ button.ghost {
 }
 .search-field:focus-within {
   border-color: var(--accent);
-  background: #0c1526;
-  box-shadow: 0 0 0 3px rgba(53,201,123,.14);
+  background: #17130d;
+  box-shadow: 0 0 0 3px rgba(255,174,26,.14);
 }
 .search-field input {
   flex: 1;
@@ -807,8 +886,8 @@ button.ghost {
   line-height: 1.3;
   cursor: pointer;
 }
-.suggestions li:hover, .suggestions li.active { background: rgba(53,201,123,.13); }
-.suggestions li.active { box-shadow: inset 0 0 0 1px rgba(53,201,123,.35); }
+.suggestions li:hover, .suggestions li.active { background: rgba(255,174,26,.13); }
+.suggestions li.active { box-shadow: inset 0 0 0 1px rgba(255,174,26,.35); }
 
 .sg-icon {
   width: 32px; height: 32px; flex: none;
@@ -893,7 +972,7 @@ button.ghost {
   color: var(--text); background: transparent;
   border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer;
 }
-.region-row button:hover { border-color: #3a424c; }
+.region-row button:hover { border-color: #4a3e2f; }
 #regionEditor { margin-bottom: 12px; }
 
 /* ---- Origin / destination pair ------------------------------------------- */
@@ -959,7 +1038,7 @@ button.ghost {
   border-radius: 9px; border: 1px solid var(--line);
   background: var(--bg-input); color: var(--text);
 }
-.pin-popup button.as-start { background: var(--accent); color: #08150e; border-color: var(--accent); }
+.pin-popup button.as-start { background: var(--accent); color: #17120a; border-color: var(--accent); }
 
 .link-btn {
   display: block; width: 100%;
@@ -994,7 +1073,7 @@ button.ghost {
 }
 .map-screen.active, .nav-screen.active { display: block; }
 
-.fullmap { position: absolute; inset: 0; background: #101216; z-index: 0; }
+.fullmap { position: absolute; inset: 0; background: #131009; z-index: 0; }
 
 /* ---- Basemap surface -----------------------------------------------------
    The colour you see wherever a tile has not arrived yet. Leaflet leaves that
@@ -1002,17 +1081,17 @@ button.ghost {
    under the pale basemap is the flash people read as "the map glitched" when
    zooming. Matching each style's own background makes the gap invisible
    instead of merely brief. */
-.leaflet-container { background: #101216; font: inherit; }
+.leaflet-container { background: #131009; font: inherit; }
 .leaflet-container[data-basemap="light"]     { background: #e8e4dd; }
-.leaflet-container[data-basemap="satellite"] { background: #16202b; }
+.leaflet-container[data-basemap="satellite"] { background: #241d14; }
 .fullmap[data-basemap="light"]     { background: #e8e4dd; }
-.fullmap[data-basemap="satellite"] { background: #16202b; }
+.fullmap[data-basemap="satellite"] { background: #241d14; }
 
 /* Tiles fade in over the surface rather than snapping, which turns the
    remaining load time into something that reads as arriving. */
 .basemap-tile { transition: opacity .18s var(--ease); }
 .leaflet-control-attribution {
-  background: rgba(11,18,32,.82) !important;
+  background: rgba(20,17,13,.82) !important;
   color: var(--text-dim) !important;
   font-size: 9.5px !important;
 }
@@ -1021,7 +1100,7 @@ button.ghost {
 /* ---- Map markers --------------------------------------------------------- */
 .map-pin {
   width: 16px; height: 16px; border-radius: 50%;
-  border: 3px solid #101216; box-shadow: 0 0 0 2px currentColor, 0 2px 8px rgba(0,0,0,.6);
+  border: 3px solid #131009; box-shadow: 0 0 0 2px currentColor, 0 2px 8px rgba(0,0,0,.6);
 }
 .map-pin.start { background: var(--accent); color: var(--accent); }
 .map-pin.end { background: var(--warn); color: var(--warn); }
@@ -1029,9 +1108,9 @@ button.ghost {
 /* The driver's own position: a heading cone under a solid dot. */
 .me-dot {
   width: 20px; height: 20px; border-radius: 50%;
-  background: var(--k-aero);
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 6px rgba(57,135,229,.22), 0 2px 10px rgba(0,0,0,.7);
+  background: var(--bone);
+  border: 3px solid #17120a;
+  box-shadow: 0 0 0 6px rgba(244,236,220,.16), 0 2px 10px rgba(0,0,0,.75);
 }
 
 /* ---- Top overlay (search) ------------------------------------------------ */
@@ -1119,7 +1198,7 @@ button.ghost {
   color: var(--text-dim); background: transparent;
   border: 0; border-radius: 9px; cursor: pointer;
 }
-.layer-menu button.on { background: rgba(53,201,123,.15); color: var(--accent); }
+.layer-menu button.on { background: rgba(255,174,26,.15); color: var(--accent); }
 
 .map-status {
   position: absolute;
@@ -1128,14 +1207,14 @@ button.ghost {
   transition: bottom .28s cubic-bezier(.4,0,.2,1);
   text-align: center; font-size: 13px; font-weight: 600;
   color: var(--text);
-  background: rgba(11,18,32,.92);
+  background: rgba(20,17,13,.92);
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 10px 12px;
   box-shadow: 0 6px 20px rgba(0,0,0,.5);
 }
 .map-status:empty { display: none; }
-.map-status.error { color: var(--danger); border-color: rgba(255,106,94,.4); }
+.map-status.error { color: var(--danger); border-color: rgba(255,86,70,.4); }
 .map-status.busy { color: var(--text-dim); }
 
 /* ---- Bottom sheet -------------------------------------------------------- */
@@ -1196,7 +1275,7 @@ button.ghost {
   border-radius: 13px;
   cursor: pointer;
 }
-.route-alt.on { border-color: var(--accent); background: rgba(53,201,123,.09); }
+.route-alt.on { border-color: var(--accent); background: rgba(255,174,26,.09); }
 .route-alt-main { flex: 1; min-width: 0; }
 .route-alt-time {
   font-size: 17px; font-weight: 700; color: var(--text);
@@ -1219,12 +1298,11 @@ button.ghost {
   padding: 2px 7px; border-radius: 5px;
   font-size: 9.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
 }
-.route-badge.fastest { background: rgba(57,135,229,.18); color: var(--k-aero); }
-.route-badge.efficient { background: rgba(53,201,123,.18); color: var(--accent); }
+.route-badge.fastest { background: rgba(77,144,224,.18); color: var(--k-aero); }
+.route-badge.efficient { background: rgba(255,174,26,.18); color: var(--accent); }
 
 .sheet-actions { display: flex; gap: 8px; margin-top: 12px; }
 .sheet-actions button { flex: 1; }
-button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
 
 /* ---- Directions list ----------------------------------------------------- */
 .directions-title {
@@ -1239,7 +1317,7 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
 }
 .directions li:last-child { border-bottom: 0; }
 .directions li.done { opacity: .38; }
-.directions li.current { background: rgba(53,201,123,.07); border-radius: 10px; }
+.directions li.current { background: rgba(255,174,26,.07); border-radius: 10px; }
 .dir-icon {
   width: 30px; height: 30px; flex: none; margin-top: 1px;
   fill: none; stroke: var(--text); stroke-width: 2;
@@ -1260,7 +1338,7 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   display: flex; align-items: center; gap: 14px;
   margin: calc(env(safe-area-inset-top) + 8px) 10px 0;
   padding: 14px 12px;
-  background: linear-gradient(180deg, #1c2026, #14171b);
+  background: linear-gradient(180deg, #282118, #1b1712);
   border: 1px solid var(--line);
   border-radius: 17px;
   box-shadow: 0 10px 32px rgba(0,0,0,.6);
@@ -1272,16 +1350,16 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
 }
 .nav-banner-text { flex: 1; min-width: 0; }
 .nav-dist {
-  font-size: 26px; font-weight: 800; line-height: 1.05;
-  letter-spacing: -.035em; font-variant-numeric: tabular-nums;
-  color: var(--text);
+  font: 700 27px/1.05 var(--face-data);
+  letter-spacing: .01em; font-variant-numeric: tabular-nums;
+  color: var(--bone);
 }
 .nav-instr {
   font-size: 14.5px; line-height: 1.3; margin-top: 3px; color: var(--text);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .nav-close { flex: none; }
-.nav-banner.rerouting { border-color: rgba(240,169,59,.5); }
+.nav-banner.rerouting { border-color: rgba(255,174,26,.5); }
 
 .nav-then {
   position: absolute;
@@ -1289,8 +1367,8 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   z-index: 999;
   margin-top: calc(env(safe-area-inset-top) + 92px);
   padding: 8px 14px;
-  font-size: 12.5px; color: var(--text-dim);
-  background: rgba(19,28,48,.94);
+  font: 400 12.5px/1.35 var(--face-text); color: var(--bone-dim);
+  background: rgba(32,26,18,.95);
   border: 1px solid var(--line);
   border-top: 0;
   border-radius: 0 0 13px 13px;
@@ -1308,7 +1386,7 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   bottom: calc(var(--sheet-h, 140px) + 14px);
   transition: bottom .28s cubic-bezier(.4,0,.2,1);
   padding: 6px 11px; font-size: 11.5px;
-  background: rgba(11,18,32,.9);
+  background: rgba(20,17,13,.9);
   border: 1px solid var(--line); border-radius: 9px;
 }
 
@@ -1318,11 +1396,23 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   text-align: center; margin-bottom: 10px;
 }
 .nav-eta-main b {
-  display: block; font-size: 21px; font-weight: 800;
-  font-variant-numeric: tabular-nums; line-height: 1.1;
+  display: block;
+  font: 700 22px/1.1 var(--face-data);
+  letter-spacing: .01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--bone);
 }
-.nav-eta-main span { display: block; font-size: 10.5px; color: var(--text-dim); margin-top: 3px; }
-.nav-eta-main.battery b { color: var(--accent); }
+.nav-eta-main span {
+  display: block;
+  margin-top: 4px;
+  font: 500 9.5px/1 var(--face-data);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--bone-mute);
+}
+/* Unlit while it is fine. The tight and bad rules below are the only ones
+   that light it, which is the whole point of the palette. */
+.nav-eta-main.battery b { color: var(--bone); }
 .nav-eta-main.battery.tight b { color: var(--warn); }
 .nav-eta-main.battery.bad b { color: var(--danger); }
 
@@ -1343,7 +1433,7 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   cursor: pointer;
   border: 1.5px solid var(--accent);
   background: var(--accent);
-  color: #08150e;
+  color: #17120a;
 }
 .drive-toggle .drive-icon {
   width: 22px; height: 22px; flex: none;
@@ -1422,8 +1512,8 @@ button.primary.compact { margin-top: 0; padding: 14px; font-size: 15px; }
   margin-top: 10px; padding: 9px 11px;
   font-size: 11.5px; line-height: 1.4;
   color: var(--danger);
-  background: rgba(255,106,94,.1);
-  border: 1px solid rgba(255,106,94,.35);
+  background: rgba(255,86,70,.1);
+  border: 1px solid rgba(255,86,70,.35);
   border-radius: 9px;
   overflow-wrap: anywhere;
 }
@@ -1491,7 +1581,7 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
 
 .auto-badge {
   font-size: 9.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
-  color: #08150e; background: var(--accent);
+  color: #17120a; background: var(--accent);
   padding: 2px 6px; border-radius: 5px; font-style: normal;
 }
 
@@ -1549,7 +1639,7 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
 .disclosure > summary:focus-visible { outline: 2px solid var(--accent); border-radius: 8px; }
 
 /* A disclosure that has something wrong inside it says so on the closed row. */
-.disclosure.attention { border-color: rgba(255,106,94,.45); }
+.disclosure.attention { border-color: rgba(255,86,70,.45); }
 .disclosure.attention > summary > em { color: var(--danger); }
 
 .disclosure .trip-log { display: flex; justify-content: space-between; gap: 8px; }
@@ -1578,39 +1668,22 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .25);
 }
 
-/* The prediction is the whole point of the setup screen, so it stops looking
-   like just another card. */
-.card.result {
-  position: relative;
-  background:
-    radial-gradient(140% 90% at 50% 0%, rgba(56, 224, 138, .10), transparent 65%),
-    var(--bg-card);
-  border-color: rgba(56, 224, 138, .28);
-}
-.card.result::before {
-  content: '';
-  position: absolute; inset: -1px -1px auto -1px; height: 2px;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: .55;
-}
-
 /* Search results: tint the icon by category. Finding the city among fifteen
    shops becomes a colour judgement rather than a reading task. */
 .sg-icon { transition: background .15s, border-color .15s; }
-.suggestions li[data-kind="city"]   .sg-icon { background: rgba(57,135,229,.13); border-color: rgba(57,135,229,.30); }
+.suggestions li[data-kind="city"]   .sg-icon { background: rgba(77,144,224,.13); border-color: rgba(77,144,224,.30); }
 .suggestions li[data-kind="city"]   .sg-icon svg { stroke: var(--k-aero); }
-.suggestions li[data-kind="road"]   .sg-icon { background: rgba(240,169,59,.12); border-color: rgba(240,169,59,.28); }
+.suggestions li[data-kind="road"]   .sg-icon { background: rgba(226,103,58,.13); border-color: rgba(226,103,58,.30); }
 .suggestions li[data-kind="road"]   .sg-icon svg { stroke: var(--k-roll); }
-.suggestions li[data-kind="charge"] .sg-icon { background: rgba(53,201,123,.14); border-color: rgba(53,201,123,.32); }
-.suggestions li[data-kind="charge"] .sg-icon svg { stroke: var(--accent); }
+.suggestions li[data-kind="charge"] .sg-icon { background: rgba(255,174,26,.14); border-color: rgba(255,174,26,.32); }
+.suggestions li[data-kind="charge"] .sg-icon svg { stroke: var(--amber); }
 .suggestions li[data-kind="rail"]   .sg-icon,
-.suggestions li[data-kind="air"]    .sg-icon { background: rgba(192,125,255,.12); border-color: rgba(192,125,255,.28); }
+.suggestions li[data-kind="air"]    .sg-icon { background: rgba(144,128,224,.12); border-color: rgba(144,128,224,.28); }
 .suggestions li[data-kind="rail"]   .sg-icon svg,
 .suggestions li[data-kind="air"]    .sg-icon svg { stroke: var(--k-grade); }
 .suggestions li[data-kind="home"]   .sg-icon svg { stroke: var(--text); }
 
-.suggestions li[data-kind="poi"]    .sg-icon { background: rgba(232,238,252,.07); }
+.suggestions li[data-kind="poi"]    .sg-icon { background: rgba(244,236,220,.07); }
 .suggestions li[data-kind="poi"]    .sg-icon svg { stroke: var(--text); }
 
 /* On a phone the address is the part that gets squeezed, and the address is
@@ -1644,7 +1717,7 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
    unreachable a search legitimately takes a few seconds. */
 .suggestions li.loading {
   background: linear-gradient(90deg,
-    transparent 0%, rgba(53,201,123,.10) 45%, rgba(53,201,123,.10) 55%, transparent 100%);
+    transparent 0%, rgba(255,174,26,.10) 45%, rgba(255,174,26,.10) 55%, transparent 100%);
   background-size: 220% 100%;
   animation: sheen 1.3s ease-in-out infinite;
 }
@@ -1655,7 +1728,7 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
 
 /* The chosen segment gets a little lift instead of a flat fill. */
 .segmented button.on {
-  box-shadow: 0 2px 8px rgba(56, 224, 138, .28);
+  box-shadow: 0 2px 8px rgba(255, 174, 26, .30);
 }
 .segmented button:not(.on):hover { background: rgba(255, 255, 255, .04); color: var(--text); }
 
@@ -1668,7 +1741,7 @@ button.secondary.on { background: var(--danger); color: #2a0508; border-color: v
 
 /* Rounded ends on the energy bar, and a touch of separation between segments. */
 .bar { border-radius: 999px; overflow: hidden; }
-.seg + .seg { box-shadow: inset 1px 0 0 rgba(11, 18, 32, .55); }
+.seg + .seg { box-shadow: inset 1px 0 0 rgba(20, 17, 13, .55); }
 
 /* ---- Sheet on a wide screen ---------------------------------------------
    A bottom sheet is a phone idea. Stretched across a 1280px desktop it made
