@@ -21,7 +21,9 @@ import {
   maps, drawNavRoute, updateNavCamera, recentreNav, showScreen,
 } from './maps.js';
 import { readConditions } from './conditions.js';
-import { render, climateDescription, speedAdvice, advicePara } from './setup-screen.js';
+import {
+  render, climateDescription, speedAdvice, advicePara, paintClimateCosts,
+} from './setup-screen.js';
 import { paintDirections } from './planner.js';
 import {
   STALE_FIX_MS, startGeolocation, stopGeolocation, setGpsState, setSpeedSource,
@@ -71,7 +73,6 @@ export async function startTrip() {
   trip.lastFix = null;
   trip.lastFixAt = 0;
   trip.staleWarned = false;
-  trip.smoothedDrawW = 0;
   trip.fellBackToManual = false;
 
   // Start optimistic: try GPS, and seed manual mode with the planned speed so
@@ -455,11 +456,6 @@ export function setDriving(on, reason = '') {
     trip.speedKmh = trip.manualSpeedKmh;
   }
 
-  // Starting or stopping is a discontinuity, not a wobble. Clearing this makes
-  // the next tick re-seed the average from the new draw instead of crawling
-  // across the gap — which is what shed six hours a second on "Start driving".
-  trip.smoothedDrawW = 0;
-
   if (trip.active) tick();
 }
 
@@ -585,46 +581,37 @@ export function tick() {
   // When stationary the "per kilometre" framing is meaningless, so bill only
   // the genuine per-hour loads. That is a useful readout in itself: "parked
   // with the AC on, you have 9 hours".
-  const idleW = climatePowerW(base.climateLevel, base.tempC, base.car.heatPump)
+  const idleW = climatePowerW(base.climateLevel, base.tempC, base.car.heatPump, base.occupants)
               + C.BASELINE_AUX_W;
   const drawW = vShown === 0 ? idleW : p.powerKw * 1000;
   // effDtH is 0 while paused, so a projected speed can never invent energy.
   trip.usedWh += drawW * effDtH;
 
-  // --- The draw behind the HEADLINE prediction ------------------------------
-  //
   // ==========================================================================
-  // WHY THIS IS NOT SIMPLY SMOOTHED, AND THE BUG THAT TAUGHT US
+  // THE HEADLINE COUNTDOWN, AND THE TWO BUGS THAT SHAPED IT
   // ==========================================================================
-  // The headline is `remaining energy / draw`. Smoothing the draw sounds safe
-  // and is not, because the draw is a DENOMINATOR: a slowly-rising denominator
-  // makes the headline fall hyperbolically, fastest at the start.
-  //
-  // Measured on a real transition. Pressing "Start driving" at 110 km/h took
-  // the draw from 0.7 kW to 17.2 kW instantly, but a 30-second average crawled
-  // between the two — and the headline shed SIX HOURS PER SECOND while the kW
-  // tile sat perfectly still at 17.2:
+  // FIRST BUG — smoothing the draw. The headline is `energy / draw`, so the
+  // draw is a DENOMINATOR: a slowly-rising denominator makes the headline fall
+  // hyperbolically, fastest at the start. Pressing "Start driving" at 110 km/h
+  // took the draw from 0.7 kW to 17.2 kW instantly, but a 30-second average
+  // crawled between the two — and the headline shed SIX HOURS PER SECOND while
+  // the kW tile sat perfectly still at 17.2:
   //
   //     67h 45m -> 27h 46m -> 21h 39m -> 17h 51m -> 15h 15m ...
   //
-  // The smoothing was added to stop the headline jumping. It turned one honest
-  // instant jump into a half-minute freefall that looked far more broken.
+  // The smoothing had been added to stop the headline jumping. It turned one
+  // honest instant jump into a half-minute freefall that looked far worse.
   //
-  // The rule that actually holds: smooth a MEASUREMENT, never a STATEMENT.
-  //   - Manual and simulated speeds are stated intentions. Exact. No smoothing.
-  //   - GPS speed is a measurement, and is ALREADY smoothed above (alpha 0.3).
-  //     The draw derived from it is therefore smooth too, so a second stage
-  //     buys nothing and costs correctness.
+  // The rule that holds: smooth a MEASUREMENT, never a STATEMENT. Manual and
+  // simulated speeds are stated intentions and are exact. GPS speed is a
+  // measurement and is ALREADY smoothed above at alpha 0.3, so anything
+  // derived from it is smooth too. A second stage bought nothing, and it is
+  // now gone entirely — this is just the model's own answer.
   //
-  // What remains is a light average that exists only to damp residual GPS
-  // jitter at cruise — and it is re-seeded on every change of driving state,
-  // so it can never crawl across a transition again. The kW tile keeps the
-  // true instantaneous value; that one is meant to be live.
-  const speedIsStated = trip.simulating || trip.speedSource === 'manual';
-  trip.smoothedDrawW = (trip.paused || speedIsStated || !trip.smoothedDrawW)
-    ? drawW
-    : trip.smoothedDrawW + 0.25 * (drawW - trip.smoothedDrawW);
-
+  // SECOND BUG — the model's own answer was wrong whenever the route climbed,
+  // because range divided the whole battery by a Wh/km that had the route's
+  // hill baked into it. predict() now covers the route at the route's cost and
+  // continues on the flat beyond it, so take the figure straight from there.
   renderLive(live, p, vShown, drawW, idleW, remainingKm, assuming);
 }
 
@@ -643,10 +630,13 @@ function renderLive(cond, p, v, drawW, idleW, remainingKm, assuming = false) {
   const { fullWh } = availableEnergyWh(cond.car, 100, cond.sohPercent, cond.tempC);
   const remainingWh = fullWh * (soc / 100);
 
-  // Headline uses the SMOOTHED draw so it stays readable; the kW tile below
-  // keeps the instantaneous value.
-  const headlineDrawW = trip.smoothedDrawW || drawW;
-  const hoursToEmpty = headlineDrawW > 0 ? remainingWh / headlineDrawW : Infinity;
+  // Standing still, "per kilometre" means nothing and the only thing draining
+  // the pack is the climate system and the electronics — so that is the honest
+  // denominator. Moving, predict() has already worked out how far this charge
+  // goes over the route and the level ground beyond it.
+  const hoursToEmpty = v === 0
+    ? (idleW > 0 ? remainingWh / idleW : Infinity)
+    : p.hoursToEmpty;
 
   $('lTimeToEmpty').textContent = formatDuration(hoursToEmpty);
   $('lEmptyClock').textContent = clockTimeIn(hoursToEmpty);
@@ -711,6 +701,7 @@ function renderLive(cond, p, v, drawW, idleW, remainingKm, assuming = false) {
       + `effect before you leave. Sitting still with the climate on, this charge would last `
       + `<strong>${formatDuration(parkedHours)}</strong>.`);
     $('climateLiveHint').textContent = climateDescription({ ...cond, speedKmh: Math.max(3, v) });
+    paintClimateCosts(cond, 'climateLive', Math.max(3, v));
     paintTripLog();
     if ($('navSheet').classList.contains('expanded')) paintDiagnostics();
     return;
@@ -744,6 +735,7 @@ function renderLive(cond, p, v, drawW, idleW, remainingKm, assuming = false) {
   // its point is the cost per km at your CURRENT speed, which changes as you
   // drive.
   $('climateLiveHint').textContent = climateDescription({ ...cond, speedKmh: Math.max(3, v) });
+  paintClimateCosts(cond, 'climateLive', Math.max(3, v));
 
   paintTripLog();
 

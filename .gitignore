@@ -8,3 +8,7 @@ tools/.playwright-mcp/
 # Playwright's scratch output, wherever it lands.
 .playwright-mcp/
 *.log
+
+# One-off measurement scripts. Kept out of the repo on purpose: they are
+# scaffolding for a specific investigation, not tests anyone should re-run.
+tools/scratch/

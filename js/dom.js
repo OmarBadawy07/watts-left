@@ -72,13 +72,20 @@ export function setSlider(id, value) {
  * helper above, which is why two nearby functions ended up with a variable
  * awkwardly named `elx` to dodge the collision.
  *
+ * The text is wrapped in a span rather than set directly on the box. The box
+ * is a flex row now — it carries a status icon beside the words — and a flex
+ * container makes a FLEX ITEM of every child, including the <strong> inside a
+ * sentence. "Press <strong>Start driving</strong> when you set off" came out
+ * as three separately-spaced blocks. One wrapper keeps the sentence a
+ * sentence.
+ *
  * @param {HTMLElement} node
  * @param {'ok'|'tight'|'bad'} kind
  * @param {string} html  trusted, app-authored markup only
  */
 export function setVerdict(node, kind, html) {
   node.className = `verdict ${node.classList.contains('big') ? 'big ' : ''}${kind}`;
-  node.innerHTML = html;
+  node.innerHTML = `<span>${html}</span>`;
 }
 
 /**

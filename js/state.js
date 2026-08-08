@@ -62,7 +62,6 @@ export const trip = {
   lastAccuracy: null,
   hasDopplerSpeed: false,
   hasSeenMovement: false,  // has this device ever demonstrated it detects motion?
-  smoothedDrawW: 0,        // slow-moving draw behind the headline countdown
   paused: true,            // nothing is counted until the driver says they are driving
   fellBackToManual: false, // guard: the GPS error callback fires over and over
   refFix: null,       // reference position for the movement-vs-noise test

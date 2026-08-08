@@ -37,7 +37,7 @@ import { state, nav, trip, ui } from './state.js';
 import { CUSTOM_CAR_DEFAULTS, findCar } from './cars.js';
 import { searchPlaces } from './geo.js';
 import { attachPicker, attachSheetHandle } from './picker.js';
-import { setBasemap, showScreen } from './maps.js';
+import { maps, setBasemap, showScreen } from './maps.js';
 import { carSubtitle } from './conditions.js';
 import { loadSettings, saveSettings } from './persistence.js';
 import { render, paintCarChoice, filterCars } from './setup-screen.js';
@@ -293,6 +293,20 @@ function init() {
 init();
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Test handle
+//
+// The screenshot harness needs to inspect Leaflet's actual layer geometry —
+// which end of the route the "already covered" overlay is anchored to, where
+// the driver marker sits. That is not visible in the DOM and is genuinely
+// hard to judge from a screenshot: the overlay and the route are two similar
+// greens on a dark map.
+//
+// Exposing the map slots read-only is the cheapest honest way to test it. It
+// adds no behaviour and nothing in the app reads it back.
+// ---------------------------------------------------------------------------
+window.__maps = maps;
+
 // Service worker — installable and usable offline.
 //
 // The model runs entirely on-device, so once cached there is nothing to fetch.

@@ -77,6 +77,10 @@ export function readConditions(overrides = {}) {
     // Driver and passengers at 75 kg each, plus declared cargo. Kerb mass is
     // for an empty car, so the driver's own mass belongs here.
     extraMassKg: passengers * 75 + numVal('cargoKg', 0),
+    // People are also a thermal load — about 100 W of body heat each, which
+    // the air conditioning has to remove. Passed separately from the mass
+    // because it is a completely different term in the model.
+    occupants: passengers,
     climateLevel: state.climateLevel,
     calibration: trip.calibration,
     ...overrides,

@@ -25,6 +25,13 @@ export const maps = {
 /** Where the planner opens before it knows anything about you. */
 const DEFAULT_VIEW = [30.04, 31.24];
 
+/* Route line colours. Kept here rather than inline so they stay in step with
+   the stylesheet's --ok: a route drawn in last season's green beside a verdict
+   in this season's is the kind of drift nobody notices until it looks cheap. */
+const ROUTE_COLOR = '#35c97b';      // the chosen route
+const ROUTE_ALT_COLOR = '#78828f';  // alternatives, dashed and behind
+const ROUTE_DONE_COLOR = '#4b535c'; // road already covered
+
 // ---------------------------------------------------------------------------
 // Construction
 // ---------------------------------------------------------------------------
@@ -42,15 +49,69 @@ function makeMap(containerId, opts = {}) {
   return m;
 }
 
+/**
+ * ============================================================================
+ * HIGH-DPI TILES: PICK ONE MECHANISM, NEVER BOTH
+ * ============================================================================
+ * Leaflet has two separate ways to sharpen tiles on a retina screen, and they
+ * are not alternatives to each other — they COMPOUND.
+ *
+ *   {r} in the URL   Leaflet 1.9 substitutes "@2x" whenever the DISPLAY is
+ *                    retina. Read its source: the substitution is keyed on
+ *                    Browser.retina alone, not on the detectRetina option.
+ *                    The provider then serves one 512 px image for the same
+ *                    map area. This is the right mechanism when the provider
+ *                    offers @2x tiles, which CARTO does.
+ *
+ *   detectRetina     For providers that DON'T. Leaflet halves the tile size
+ *                    and adds one to the zoom offset, so it fetches four
+ *                    tiles from one level deeper and packs them into the same
+ *                    space. Four requests instead of one.
+ *
+ * This code had detectRetina switched on for the two CARTO layers whose URLs
+ * already contain {r}, so both fired at once: four requests per tile, each of
+ * them the @2x image. Sixteen times the pixels needed, from four times as many
+ * connections — which is exactly the "glitches before it renders" symptom,
+ * because zooming asks for a whole new level's worth of that.
+ *
+ * And it was switched OFF for satellite, the one layer with no {r} in its URL
+ * and therefore the only one where detectRetina would have been the right
+ * call. Precisely backwards.
+ */
 function applyBasemap(slot) {
   const cfg = BASEMAPS[ui.basemap];
   if (slot.tiles) slot.tiles.remove();
+
+  // Tell the stylesheet which basemap is showing, so the colour behind a tile
+  // that has not arrived yet matches the tiles around it. A near-black
+  // container under the light basemap is the flash people notice when zooming:
+  // the gap lasts only a moment, but a dark hole in a pale map is very loud
+  // for that moment.
+  slot.map.getContainer().dataset.basemap = ui.basemap;
+
   slot.tiles = L.tileLayer(cfg.url, {
     maxZoom: cfg.maxZoom,
     attribution: cfg.attribution,
     subdomains: cfg.subdomains || 'abc',
-    // Retina tiles where the provider offers them; {r} resolves to "@2x".
-    detectRetina: ui.basemap !== 'satellite',
+    // Only for providers without an @2x URL. Layers carrying {r} get high-DPI
+    // tiles from that alone.
+    detectRetina: !cfg.url.includes('{r}'),
+
+    // Keep two extra rings of tiles beyond the viewport (Leaflet's default is
+    // one). Panning and the zoom-out animation both reveal that margin first,
+    // so holding it is the difference between the new view being already
+    // painted and it arriving a moment later.
+    keepBuffer: 3,
+
+    // Do not fire requests for intermediate levels during a zoom animation.
+    // Those tiles are obsolete before they arrive, and they compete for the
+    // browser's six connections per host with the ones actually wanted.
+    updateWhenZooming: false,
+
+    // Leaflet's own placeholder for a tile it has not loaded is transparent,
+    // which shows the container colour and reads as a hole. A neutral tile
+    // keeps the surface continuous while the real one arrives.
+    className: 'basemap-tile',
   }).addTo(slot.map);
 }
 
@@ -132,12 +193,12 @@ export function drawRouteAlternatives(onSelect) {
     const chosen = i === state.selectedRoute;
     // A wide transparent "casing" underneath makes a thin line easy to tap.
     const casing = L.polyline(state.routes[i].coords, {
-      color: chosen ? '#38e08a' : '#7b8aa5',
+      color: chosen ? ROUTE_COLOR : ROUTE_ALT_COLOR,
       weight: chosen ? 11 : 9,
       opacity: chosen ? 0.28 : 0.16,
     }).addTo(slot.map);
     const line = L.polyline(state.routes[i].coords, {
-      color: chosen ? '#38e08a' : '#7b8aa5',
+      color: chosen ? ROUTE_COLOR : ROUTE_ALT_COLOR,
       weight: chosen ? 6 : 4,
       opacity: chosen ? 1 : 0.75,
       dashArray: chosen ? null : '1,9',
@@ -194,13 +255,13 @@ export function drawNavRoute() {
   if (!state.route?.coords?.length) return;
 
   slot.route = L.polyline(state.route.coords, {
-    color: '#38e08a', weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
+    color: ROUTE_COLOR, weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round',
   }).addTo(slot.map);
 
   // Drawn on top in a muted colour so the road already covered visibly falls
   // behind you — the clearest signal that the app is tracking your progress.
   slot.travelled = L.polyline([], {
-    color: '#54627d', weight: 7, opacity: 0.85, lineCap: 'round',
+    color: ROUTE_DONE_COLOR, weight: 7, opacity: 0.85, lineCap: 'round',
   }).addTo(slot.map);
 
   const c = state.route.coords;

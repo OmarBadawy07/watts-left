@@ -390,7 +390,9 @@ Aerodynamic drag does the exact opposite — force grows with v², so going from
 | Rolling resistance | `rollingCoeff()` | roughly constant with speed; rises ~11% at −10 °C |
 | Gradient + regen | `consumption()` | uphill costs full energy, downhill returns 65% |
 | Air density | `airDensity()` | ideal gas law — air at −10 °C is ~12% denser, so drag is ~12% higher |
-| Cabin heating / cooling | `climatePowerW()` | thermal load ÷ COP. Heat pumps ≈ 3.2 COP mild, 1.2 in deep cold; resistive heaters are stuck at 1.0 |
+| Cabin heating / cooling | `climatePowerW()` | net cabin heat balance ÷ COP. Heat pumps ≈ 3.2 COP mild, 1.2 in deep cold; resistive heaters are stuck at 1.0 |
+| Solar + occupant gain | `climatePowerW()` | ~300 W through the glass plus 100 W per person — heat the cabin gets for free, and the reason air conditioning is not free on a mild day |
+| Dehumidification | `climatePowerW()` | a cooling-only load; the compressor pays to wring water out of the fresh-air stream even when that air is already cool |
 | Cold capacity loss | `coldCapacityFactor()` | packs deliver less usable energy when cold, down to 87.5% at −10 °C |
 | Battery health | `availableEnergyWh()` | user-supplied state of health |
 | Mass | `consumption()` | passengers at 75 kg each plus cargo, affecting rolling resistance and climbing |
@@ -399,6 +401,21 @@ Winter range loss stacks from **four** independent effects at once — denser ai
 stiffer tyres, a pack that holds less, and a cabin that needs heating. That is
 why it is so much worse than people expect, and why the app models them
 separately rather than applying one fudge factor.
+
+The climate model is one continuous expression rather than a heating case, a
+cooling case and a "mild" case, because the three-case version had a dead zone
+within 1 °C of the comfort temperature that discarded the solar and occupant
+gains entirely. That made air conditioning look almost free in exactly the
+temperature range where most people drive, and made the setting appear to do
+nothing at all. `tools/test-physics.mjs` pins this down by scanning the whole
+slider range and asserting the second difference stays small — a test that
+distinguishes a genuine step from the curve merely being steep, which a plain
+threshold on the first difference cannot.
+
+Validation: at 35 °C the model puts full cooling at about 1.15 kW, against the
+1.3–1.5 kW ADAC measured on a Tesla Model Y held at 20 °C in a 35 °C chamber.
+At −10 °C it puts resistive heating at about 3.9 kW, inside the 3–5 kW band
+those cars are measured at.
 
 ### The real-world factor
 

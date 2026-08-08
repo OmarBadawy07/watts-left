@@ -25,7 +25,14 @@
      ===================================================================== -->
 <main id="screen-setup" class="screen active">
   <header class="app-header">
-    <h1>Watt's&nbsp;Left</h1>
+    <div class="wordmark">
+      <svg class="wordmark-mark" viewBox="0 0 28 28" aria-hidden="true">
+        <rect x="1.6" y="6.4" width="20" height="15.2" rx="3.4" />
+        <path d="M24.2 12.2v3.6" />
+        <path d="M12.6 9.6 8.4 15.4h3.9l-.7 3.9 4.4-5.9h-4z" class="bolt" />
+      </svg>
+      <h1>Watt's&nbsp;Left</h1>
+    </div>
     <p class="tagline">Range that knows about your right foot and your AC.</p>
   </header>
 
@@ -195,11 +202,18 @@
 
     <div class="field">
       <span class="field-label">Climate / AC level</span>
-      <div class="segmented" id="climateSetup" role="group" aria-label="Climate level">
-        <button type="button" data-climate="off">Off</button>
-        <button type="button" data-climate="low">Low</button>
-        <button type="button" data-climate="medium" class="on">Medium</button>
-        <button type="button" data-climate="high">High</button>
+      <!-- Every level shows what it would cost, not just the one selected.
+           Without this the control looked broken: on a mild day the difference
+           between Off and High is genuinely under one percent of the battery,
+           so an arrival figure rounded to whole percent did not move and the
+           setting appeared to be ignored. Four numbers side by side answer
+           "is this being counted?" at a glance, and show the honest shape of
+           it — nearly free at 20 °C, expensive at 38 °C or in traffic. -->
+      <div class="segmented costed" id="climateSetup" role="group" aria-label="Climate level">
+        <button type="button" data-climate="off"><b>Off</b><em data-cost>—</em></button>
+        <button type="button" data-climate="low"><b>Low</b><em data-cost>—</em></button>
+        <button type="button" data-climate="medium" class="on"><b>Medium</b><em data-cost>—</em></button>
+        <button type="button" data-climate="high"><b>High</b><em data-cost>—</em></button>
       </div>
       <small class="hint" id="climateHint"></small>
     </div>
@@ -241,27 +255,59 @@
   </section>
 
   <!-- ---------------- Prediction ---------------- -->
-  <section class="card result" id="setupResult">
-    <h2>Prediction</h2>
+  <!-- ============================================================
+       The payoff. Two deliberate choices here:
 
-    <div class="headline">
-      <div class="headline-main">
-        <span class="headline-value" id="pTimeToEmpty">—</span>
-        <span class="headline-unit">until 0%</span>
+       1. ARRIVAL is the hero, not the countdown. Before setting off the
+          question is "do I make it?", and that is answered by a percentage,
+          not by a duration. The countdown is the right hero once you are
+          moving, so it leads the live screen instead.
+
+       2. The battery track underneath is the whole prediction as one
+          picture: where the charge is now, how much of it this trip eats,
+          what is left, and where the reserve sits. If the solid part ends
+          before the reserve mark, you are short — visible without reading
+          a single number.
+       ============================================================ -->
+  <section class="card result" id="setupResult">
+    <div class="card-head">
+      <h2>Prediction</h2>
+      <span class="card-note" id="pTripNote"></span>
+    </div>
+
+    <div class="arrival">
+      <div class="arrival-figure">
+        <span class="arrival-value" id="pArrival">—</span>
+        <span class="arrival-unit">%</span>
       </div>
-      <div class="headline-sub" id="pEmptyClock">—</div>
+      <div class="arrival-label">charge left on arrival</div>
+    </div>
+
+    <div class="track" aria-hidden="true">
+      <div class="track-rail">
+        <div class="track-left"  id="pTrackLeft"></div>
+        <div class="track-spend" id="pTrackSpend"></div>
+        <div class="track-reserve-mark" id="pTrackReserve"></div>
+      </div>
+      <div class="track-keys">
+        <span class="track-key left"><i></i><span id="pKeyLeft">—</span></span>
+        <span class="track-key spend"><i></i><span id="pKeySpend">—</span></span>
+        <span class="track-key rsv"><i></i><span id="pKeyReserve">—</span></span>
+      </div>
     </div>
 
     <div id="pVerdict" class="verdict">—</div>
 
     <div class="stat-row">
-      <div class="stat"><span id="pArrival">—</span><label>charge on arrival</label></div>
-      <div class="stat"><span id="pWhKm">—</span><label>Wh/km</label></div>
+      <div class="stat"><span id="pTimeToEmpty">—</span><label>until 0%</label></div>
       <div class="stat"><span id="pRange">—</span><label>km of range</label></div>
+      <div class="stat"><span id="pWhKm">—</span><label>Wh/km</label></div>
       <div class="stat"><span id="pDuration">—</span><label>trip time</label></div>
     </div>
+    <div class="stat-note" id="pEmptyClock"></div>
 
     <div class="breakdown">
+      <h3 class="sub-head"><span>Where the energy goes</span><i></i><em>Wh/km</em></h3>
       <div class="breakdown-bar" id="pBar">
         <div class="seg seg-aero"></div>
         <div class="seg seg-roll"></div>
@@ -269,10 +315,10 @@
         <div class="seg seg-aux"></div>
       </div>
       <ul class="legend">
-        <li><i class="k-aero"></i>Air drag <b id="lgAero">—</b></li>
-        <li><i class="k-roll"></i>Rolling <b id="lgRoll">—</b></li>
-        <li><i class="k-grade"></i>Climbing <b id="lgGrade">—</b></li>
-        <li><i class="k-aux"></i>Climate + electronics <b id="lgAux">—</b></li>
+        <li><i class="k-aero"></i><span>Air drag</span><b id="lgAero">—</b></li>
+        <li><i class="k-roll"></i><span>Rolling</span><b id="lgRoll">—</b></li>
+        <li><i class="k-grade"></i><span>Climbing</span><b id="lgGrade">—</b></li>
+        <li><i class="k-aux"></i><span>Climate + electronics</span><b id="lgAux">—</b></li>
       </ul>
     </div>
 
@@ -505,11 +551,11 @@
            left in the open. Everything below folds away. -->
       <section class="card compact">
         <span class="field-label">Climate / AC</span>
-        <div class="segmented" id="climateLive" role="group" aria-label="Climate level">
-          <button type="button" data-climate="off">Off</button>
-          <button type="button" data-climate="low">Low</button>
-          <button type="button" data-climate="medium">Medium</button>
-          <button type="button" data-climate="high">High</button>
+        <div class="segmented costed" id="climateLive" role="group" aria-label="Climate level">
+          <button type="button" data-climate="off"><b>Off</b><em data-cost>—</em></button>
+          <button type="button" data-climate="low"><b>Low</b><em data-cost>—</em></button>
+          <button type="button" data-climate="medium"><b>Medium</b><em data-cost>—</em></button>
+          <button type="button" data-climate="high"><b>High</b><em data-cost>—</em></button>
         </div>
         <small class="hint" id="climateLiveHint"></small>
       </section>

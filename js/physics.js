@@ -65,20 +65,38 @@ export const C = {
    * fresh air the ventilation system continuously draws in.
    *
    * ~130 W/°C is representative of a mid-size car. Sanity check: at -10 °C
-   * outside and 21 °C inside, the difference is 31 °C, so the cabin needs
-   * 130 x 31 = 4.0 kW of heat. A resistive heater burns 4.0 kW of electricity
-   * to make that; a heat pump at COP 1.2 needs only ~3.4 kW. Both match
+   * outside and 21 °C inside, the difference is 31 °C, so conduction alone
+   * pulls 130 x 31 = 4.0 kW of heat out of the cabin. The free gains below give
+   * a few hundred watts of that back, so a resistive heater burns ~3.6 kW to
+   * hold the temperature and a heat pump at COP 1.2 needs ~3.0 kW. Both match
    * published measurements for real cars in winter.
    */
   CABIN_UA: 130,
 
   /**
-   * SOLAR_GAIN — extra thermal watts the air conditioning has to remove on a
-   * warm day that have nothing to do with the temperature difference: sunlight
-   * through a large glass area, body heat from the occupants, and the latent
-   * heat of pulling moisture out of the air.
+   * FREE HEAT — thermal watts the cabin gains whatever the weather.
+   *
+   * These matter far more than they look. Together they are why a car parked
+   * in the sun on a mild 20 °C day still becomes an oven, and therefore why
+   * air conditioning is NOT free at mild temperatures: it is fighting these
+   * gains long before the outside air is hotter than the cabin.
+   *
+   * SOLAR_W is a daylight average through a modern car's large glass area. It
+   * is deliberately a single number rather than a function of sun angle and
+   * cloud, neither of which the app knows. It cuts both ways — on a sunny
+   * winter day it genuinely does reduce how hard the heater has to work.
    */
-  SOLAR_GAIN: 600,
+  SOLAR_W: 300,
+  OCCUPANT_W: 100,       // W of sensible body heat per person
+
+  /**
+   * LATENT_W — the work of wringing moisture out of the fresh air the cabin
+   * draws in. This is a COOLING-ONLY load: it exists whenever the compressor
+   * runs, even when the incoming air is already cool, and it is a large part
+   * of why "the AC is on" costs something on a merely pleasant day.
+   */
+  LATENT_W: 250,
+  COP_COOL: 2.7,         // air conditioning coefficient of performance
   REGEN_EFF: 0.65,       // fraction of downhill potential energy recovered by
                          // regenerative braking (the rest is lost to friction
                          // brakes, inverter losses and heat)
@@ -186,32 +204,56 @@ export const CLIMATE_LEVELS = {
  *     electricity gives exactly one watt of heat. This is why cars without a
  *     heat pump are so much worse in winter.
  *
+ * ============================================================================
+ * WHY THIS IS ONE CONTINUOUS EXPRESSION AND NOT THREE CASES
+ * ============================================================================
+ * It used to be an if/else on the temperature difference alone: cool above
+ * +1 °C, heat below -1 °C, and in between a flat 150 W for "just moving air
+ * around". That had two faults, and the second one is what made users think
+ * the AC setting was being ignored entirely.
+ *
+ *   1. It stepped. The solar and occupant load appeared abruptly at +1 °C, so
+ *      a tenth of a degree either side of the boundary changed the answer by
+ *      over a hundred watts.
+ *
+ *   2. The dead zone threw the free gains away. Sunlight through the glass
+ *      does not stop warming the cabin because the outside air happens to be
+ *      21 °C — that is precisely when a parked car still cooks. Discarding
+ *      those gains made air conditioning look almost free at mild
+ *      temperatures, which is the range where most people actually drive.
+ *
+ * The cabin's heat balance is a single continuous quantity. Compute it once,
+ * and let its SIGN decide which machine has to deal with it.
+ *
  * @param {string} level      one of the CLIMATE_LEVELS keys
  * @param {number} tempC      outside temperature
  * @param {boolean} heatPump  does the car have a heat pump?
+ * @param {number} occupants  people in the car — each is a small heater
  * @returns {number} watts
  */
-export function climatePowerW(level, tempC, heatPump) {
+export function climatePowerW(level, tempC, heatPump, occupants = 1) {
   const cfg = CLIMATE_LEVELS[level] ?? CLIMATE_LEVELS.off;
   if (cfg.factor === 0) return 0;
 
-  const delta = tempC - C.COMFORT_C; // positive = too hot, negative = too cold
-  let electricalW;
+  // Heat the cabin gains for free, whatever the weather.
+  const freeGainW = C.SOLAR_W + C.OCCUPANT_W * Math.max(1, occupants);
 
-  if (delta > 1) {
-    // COOLING. Heat leaks IN through the bodywork and glass, plus the solar,
-    // occupant and humidity load that exists even on a merely-warm day.
-    const thermalW = C.CABIN_UA * delta + C.SOLAR_GAIN;
-    electricalW = thermalW / 2.7; // AC compressor COP
-  } else if (delta < -1) {
-    // HEATING. Heat leaks OUT at the same rate it would leak in.
-    const thermalW = C.CABIN_UA * -delta;
-    // Heat pump COP degrades as it gets colder; resistive heating is stuck at 1.
-    const cop = heatPump ? clamp(1.8 + 0.07 * tempC, 1.2, 3.2) : 1.0;
-    electricalW = thermalW / cop;
+  // Net heat flowing INTO the cabin, in thermal watts. Positive means the
+  // cabin is gaining heat and something has to take it away.
+  const netW = C.CABIN_UA * (tempC - C.COMFORT_C) + freeGainW;
+
+  let electricalW;
+  if (netW > 0) {
+    // COOLING. The compressor also has to wring moisture out of the fresh air
+    // it draws in. That load ramps in with the first few hundred watts of
+    // cooling rather than switching on, so the curve stays smooth through the
+    // crossover point.
+    const latentW = C.LATENT_W * Math.min(1, netW / 300);
+    electricalW = (netW + latentW) / C.COP_COOL;
   } else {
-    // Near-perfect ambient temperature: just moving air around.
-    electricalW = 150;
+    // HEATING. Heat pump COP degrades as it gets colder; resistive is stuck at 1.
+    const cop = heatPump ? clamp(1.8 + 0.07 * tempC, 1.2, 3.2) : 1.0;
+    electricalW = -netW / cop;
   }
 
   return cfg.factor * electricalW + cfg.blowerW;
@@ -275,7 +317,7 @@ function elevationWhPerKm({ mass, eta, climbM, descentM, tripKm, gradePercent })
 export function consumption(cond) {
   const {
     car, speedKmh, tempC, headwindKmh = 0, extraMassKg = 0,
-    gradePercent = 0, climateLevel = 'off', calibration = 1,
+    gradePercent = 0, climateLevel = 'off', calibration = 1, occupants = 1,
     // Optional elevation PROFILE. When the trip planner has fetched real
     // terrain data these carry the total metres climbed and descended over the
     // route, which is strictly better than a single net figure — see below.
@@ -334,7 +376,7 @@ export function consumption(cond) {
   });
 
   // --- The per-hour loads, converted to per-kilometre ----------------------
-  const climateW = climatePowerW(climateLevel, tempC, car.heatPump);
+  const climateW = climatePowerW(climateLevel, tempC, car.heatPump, occupants);
   const auxW = climateW + C.BASELINE_AUX_W;
   // W ÷ (km/h) = Wh/km. The units work out exactly.
   const auxWhKm = auxW / v_kmh;
@@ -348,24 +390,33 @@ export function consumption(cond) {
   const calibrated = rawWhKm * calibration;
   const whPerKm = Math.max(20, calibrated); // floor stops silly values
 
-  // When the floor bites — a steep sustained descent can drive the raw total
-  // negative — the parts must be scaled with it. Otherwise the legend on screen
-  // sums to something other than the Wh/km printed above it, and a breakdown
-  // that does not add up to its own total reads as a bug.
-  const floorScale = calibrated > 0 ? whPerKm / calibrated : 1;
-  const part = (x) => x * calibration * floorScale;
+  // ---- Keeping the legend honest ------------------------------------------
+  // A breakdown that does not add up to the total printed above it reads as a
+  // bug even when the total is right, so the parts are reconciled to it.
+  //
+  // The floor only bites on a long steep descent, where regen drives the raw
+  // total negative. An earlier version tried to scale all four parts by
+  // whPerKm/calibrated — which silently did nothing whenever `calibrated` was
+  // negative, i.e. in every case the floor was actually for.
+  //
+  // Scaling was the wrong instrument anyway. The floor is a statement about
+  // ONE term: we do not believe you will recover that much energy going
+  // downhill. So the shortfall belongs on the terrain line, and the aero,
+  // rolling and climate figures stay exactly as computed.
+  const parts = {
+    aero: aeroWhKm * calibration,
+    rolling: rollWhKm * calibration,
+    grade: gradeWhKm * calibration,
+    aux: auxWhKm * calibration,
+  };
+  parts.grade += whPerKm - (parts.aero + parts.rolling + parts.grade + parts.aux);
 
   return {
     whPerKm,
     powerW: whPerKm * v_kmh, // Wh/km x km/h = Wh/h = W
     airDensity: rho,
     climateW,
-    breakdown: {
-      aero: part(aeroWhKm),
-      rolling: part(rollWhKm),
-      grade: part(gradeWhKm),
-      aux: part(auxWhKm),
-    },
+    breakdown: parts,
   };
 }
 
@@ -417,12 +468,37 @@ export function predict(input) {
   const reserveWh = fullWh * (reservePercent / 100);
   const usableNowWh = Math.max(0, remainingWh - reserveWh);
 
-  // --- Headline number: when do we hit 0%? ---------------------------------
-  const hoursToEmpty = cons.powerW > 0 ? remainingWh / cons.powerW : Infinity;
-  const kmToEmpty = remainingWh / cons.whPerKm;
-
   // --- The number that actually drives decisions: do we make it? -----------
   const tripEnergyWh = cons.whPerKm * tripKm;
+
+  // ==========================================================================
+  // RANGE AND TIME TO EMPTY — WHY THE TERRAIN HAS TO BE DROPPED PART WAY
+  // ==========================================================================
+  // cons.whPerKm carries this ROUTE's climbing, averaged over the route's
+  // length. That is exactly right for "what will this trip cost", and exactly
+  // wrong for "how far can I get", because dividing the whole battery by it
+  // assumes the hill goes on for ever.
+  //
+  // The failure was severe and easy to reproduce: a 5 km route with 500 m of
+  // climb amortises to ~700 Wh/km, so a battery at 80% reported
+  //
+  //     "0% in 36 minutes"      next to      "arrival 74%"
+  //
+  // on the same card, for a drive lasting three minutes. Both numbers came
+  // from the same model; only one of them was being asked a sensible question.
+  //
+  // So the honest answer is in two parts: the route is covered at the route's
+  // real cost, and whatever charge survives that carries on over level ground.
+  const cruise = consumption({
+    ...input, gradePercent: 0, climbM: null, descentM: null,
+  });
+  const kmToEmpty = remainingWh <= tripEnergyWh
+    ? remainingWh / cons.whPerKm                                  // dies on the route
+    : tripKm + (remainingWh - tripEnergyWh) / cruise.whPerKm;     // survives it
+  // Both segments are driven at the same speed, so time is simply distance
+  // over speed — and it stays consistent with kmToEmpty by construction.
+  const hoursToEmpty = kmToEmpty / Math.max(3, input.speedKmh);
+
   const arrivalWh = remainingWh - tripEnergyWh;
   const arrivalSoc = (arrivalWh / fullWh) * 100;
   const shortfallKm = arrivalWh >= 0 ? 0 : (-arrivalWh) / cons.whPerKm;
@@ -430,6 +506,10 @@ export function predict(input) {
 
   return {
     whPerKm: cons.whPerKm,
+    // What the car would use on the flat at these settings. The UI quotes this
+    // alongside range, so a hilly route cannot make the range figure look like
+    // a different car.
+    cruiseWhPerKm: cruise.whPerKm,
     powerKw: cons.powerW / 1000,
     climateW: cons.climateW,
     breakdown: cons.breakdown,

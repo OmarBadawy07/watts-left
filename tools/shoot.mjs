@@ -336,6 +336,42 @@ async function runRoute() {
       return chose;
     };
 
+    // ---- Tile fetching during a zoom -------------------------------------
+    //
+    // The "map glitches before it renders" report came down to Leaflet's TWO
+    // high-DPI mechanisms both being switched on for the same layer: the {r}
+    // token in the CARTO URL, which Leaflet substitutes on any retina display,
+    // AND detectRetina, which independently halves the tile size and fetches
+    // from one zoom level deeper. Together they pulled four @2x tiles where
+    // one was wanted.
+    //
+    // Both facts are checked, because either alone can regress: the layer must
+    // not be running detectRetina, and a zoom must not fetch an absurd number
+    // of tiles.
+    const tiles = [];
+    const onTile = (r) => { if (/basemaps\.cartocdn\.com/.test(r.url())) tiles.push(r.url()); };
+    page.on('request', onTile);
+    await page.evaluate(() => window.__maps.plan.map.setZoom(13));
+    await page.waitForTimeout(2500);
+    tiles.length = 0;
+    await page.evaluate(() => window.__maps.plan.map.setZoom(15));
+    await page.waitForTimeout(3000);
+    page.off('request', onTile);
+
+    const layer = await page.evaluate(() => {
+      const t = window.__maps.plan.tiles.options;
+      return { detectRetina: !!t.detectRetina, tileSize: t.tileSize, keepBuffer: t.keepBuffer };
+    });
+    log(`${label}-tiles-one-retina-mechanism`, layer.detectRetina === false,
+      `detectRetina=${layer.detectRetina} tileSize=${layer.tileSize} keepBuffer=${layer.keepBuffer}`);
+
+    // A 1280x800 viewport at zoom 15 needs roughly 5x4 tiles, plus the
+    // keepBuffer ring: comfortably under 60. The doubled-up configuration
+    // asked for four times that.
+    const retina2x = tiles.filter((u) => u.includes('@2x')).length;
+    log(`${label}-zoom-tile-count-sane`, tiles.length > 0 && tiles.length <= 60,
+      `${tiles.length} tiles for one zoom step (${retina2x} at @2x)`);
+
     log(`${label}-pick-from`, true, await pick('from', 'Cairo'));
     log(`${label}-pick-to`, true, await pick('to', 'Alexandria'));
 
@@ -343,11 +379,32 @@ async function runRoute() {
     // Generous on purpose: with one geocoder unavailable every lookup pays a
     // timeout first, and this step covers routing, elevation for every
     // alternative, and weather.
-    await page.waitForFunction(
-      () => document.querySelectorAll('#routeAlts .route-alt').length > 0,
-      null,
-      { timeout: 90000 },
-    );
+    //
+    // If it times out anyway, find out WHOSE fault it was before failing. This
+    // step depends on a free public router, and one run in several has died
+    // here while the router was demonstrably healthy a second later. A suite
+    // that reports somebody else's bad minute as our regression is a suite
+    // people stop reading — the same reasoning as EXTERNAL_HOSTS above, which
+    // already applies to console and request errors but not to this wait.
+    try {
+      await page.waitForFunction(
+        () => document.querySelectorAll('#routeAlts .route-alt').length > 0,
+        null,
+        { timeout: 90000 },
+      );
+    } catch (err) {
+      const reachable = await page.evaluate(async () => {
+        try {
+          const r = await fetch('https://router.project-osrm.org/route/v1/driving/'
+            + '31.2357,30.0444;31.2001,29.9187?overview=false', { cache: 'no-store' });
+          return r.ok;
+        } catch { return false; }
+      });
+      log(`${label}-planned`, false, reachable
+        ? 'no routes drawn, and the router IS reachable — this one is ours'
+        : 'the router did not answer — external outage, not a regression');
+      throw err;
+    }
     await page.waitForTimeout(9000);
     await shot(page, `${label}-01-planned`);
 
@@ -406,6 +463,45 @@ async function runRoute() {
     const advanced = samples[samples.length - 1].driven > samples[0].driven;
     log(`${label}-sim-advances`, advanced,
       `${samples[0].driven} km -> ${samples[samples.length - 1].driven} km`);
+
+    // The "road already covered" overlay must be BEHIND the driver.
+    //
+    // Worth testing rather than eyeballing: on a screenshot the overlay and
+    // the route are two similar greens on a dark map, and which end of the
+    // line is dimmed is genuinely hard to judge by looking. Geometry settles
+    // it — the overlay must start at the route's first coordinate and end at
+    // the driver, never the other way round.
+    const overlay = await page.evaluate(() => {
+      const R = window.__maps?.nav;
+      if (!R?.travelled || !R?.me) return null;
+      const km = (a, b) => {
+        const toRad = (d) => (d * Math.PI) / 180;
+        const dLat = toRad(b.lat - a.lat);
+        const dLon = toRad(b.lng - a.lng);
+        const h = Math.sin(dLat / 2) ** 2
+          + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+        return 6371 * 2 * Math.asin(Math.sqrt(h));
+      };
+      const pts = R.travelled.getLatLngs();
+      if (pts.length < 2) return null;
+      const routePts = R.route.getLatLngs();
+      const me = R.me.getLatLng();
+      return {
+        n: pts.length,
+        fromStart: km(pts[0], routePts[0]),
+        fromEnd: km(pts[0], routePts[routePts.length - 1]),
+        tailToDriver: km(pts[pts.length - 1], me),
+      };
+    });
+    const overlayOk = overlay
+      && overlay.fromStart < overlay.fromEnd   // anchored at the start, not the end
+      && overlay.tailToDriver < 1.0;           // and it stops where the driver is
+    log(`${label}-travelled-overlay-behind-driver`, !!overlayOk,
+      overlay
+        ? `head ${overlay.fromStart.toFixed(2)} km from route start / `
+          + `${overlay.fromEnd.toFixed(2)} km from end · `
+          + `tail ${overlay.tailToDriver.toFixed(2)} km from driver`
+        : 'no overlay drawn');
 
     // Diagnostics must not report synthetic positions as real GPS fixes.
     await page.evaluate(() => document.getElementById('navSheet').classList.add('expanded'));

@@ -12,7 +12,7 @@
 
 // Bump this string whenever a shell file changes, otherwise returning users
 // keep getting the previously cached version.
-const CACHE = 'wattsleft-v10';
+const CACHE = 'wattsleft-v12';
 
 // EVERY module must be listed. They are ES modules loaded by static import, so
 // a missing entry does not degrade gracefully — offline, that import fails and

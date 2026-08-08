@@ -11,7 +11,7 @@ import { state } from './state.js';
 import { CARS, findCar } from './cars.js';
 import {
   C, predict, maxSustainableSpeed, mostEfficientSpeed, climatePowerW,
-  formatDuration, clockTimeIn,
+  availableEnergyWh, formatDuration, clockTimeIn,
 } from './physics.js';
 import { readConditions, currentCar, carSubtitle } from './conditions.js';
 
@@ -65,7 +65,8 @@ function renderBreakdown(breakdown, ids) {
   const order = [parts.aero, parts.roll, parts.grade, parts.aux];
   segs.forEach((seg, i) => { seg.style.width = `${(order[i] / total) * 100}%`; });
 
-  const fmt = (v) => `${Math.round(v)} Wh/km`;
+  // Bare numbers — the unit is stated once, on the heading above the bar.
+  const fmt = (v) => `${Math.round(v)}`;
   $(ids.aero).textContent = fmt(breakdown.aero);
   $(ids.roll).textContent = fmt(breakdown.rolling);
   $(ids.grade).textContent = fmt(breakdown.grade);
@@ -96,6 +97,75 @@ function syncOutputs() {
   $('fineTuneSummary').textContent = parts.join(' · ');
 }
 
+/**
+ * Paint what each climate level would cost, on every button at once.
+ *
+ * This exists because the control looked broken. On a mild day the difference
+ * between Off and High is genuinely under one percent of the battery, so an
+ * arrival figure rounded to whole percent did not move when you changed it,
+ * and the reasonable conclusion was that the setting was being ignored.
+ *
+ * Showing all four costs together fixes that honestly — it does not
+ * exaggerate the effect, it just stops hiding it. It also makes the model's
+ * most interesting behaviour visible: the same four numbers roughly triple
+ * between 20 °C and 38 °C, and triple again if you are crawling in traffic
+ * rather than cruising, because climate is a cost per HOUR.
+ *
+ * @param {Object} cond     conditions, already read
+ * @param {string} groupId  the segmented control to paint
+ * @param {number} speedKmh speed to bill the per-hour load at
+ */
+export function paintClimateCosts(cond, groupId, speedKmh = cond.speedKmh) {
+  const group = $(groupId);
+  if (!group) return;
+
+  const { fullWh } = availableEnergyWh(cond.car, 100, cond.sohPercent, cond.tempC);
+  // With a trip on the table, quote the whole trip. Without one there is no
+  // distance to spread it over, so quote it per hour — which is the unit the
+  // load is really in anyway.
+  const hours = cond.tripKm > 0 ? cond.tripKm / Math.max(3, speedKmh) : 1;
+
+  for (const btn of group.querySelectorAll('button[data-climate]')) {
+    const out = btn.querySelector('[data-cost]');
+    if (!out) continue;
+    const w = climatePowerW(btn.dataset.climate, cond.tempC, cond.car.heatPump, cond.occupants);
+    if (w === 0 || !(fullWh > 0)) { out.textContent = '—'; continue; }
+    const pct = ((w * hours) / fullWh) * 100;
+    // One decimal below 10% — the whole point is that small differences stay
+    // visible, and rounding them away is the bug this is fixing.
+    out.textContent = pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
+  }
+}
+
+/**
+ * The battery track: the entire prediction as one picture.
+ *
+ * Left to right is 100% of the pack down to 0%, so the bar drains the way a
+ * fuel gauge does. The solid part is what you arrive with, the dimmed part is
+ * what the trip eats, and the notch is the reserve. If the solid part ends
+ * before the notch you are under your reserve, which you can see without
+ * reading any of the numbers.
+ */
+function renderTrack(cond, p) {
+  const now = Math.max(0, Math.min(100, cond.socPercent));
+  const arrival = Math.max(0, Math.min(now, p.arrivalSoc));
+  const spend = Math.max(0, now - arrival);
+
+  $('pTrackLeft').style.width = `${arrival}%`;
+  $('pTrackSpend').style.left = `${arrival}%`;
+  $('pTrackSpend').style.width = `${spend}%`;
+
+  const mark = $('pTrackReserve');
+  mark.style.left = `${Math.min(100, cond.reservePercent)}%`;
+  mark.classList.toggle('hidden', cond.reservePercent <= 0);
+
+  $('pKeyLeft').textContent = `${Math.round(arrival)}% on arrival`;
+  $('pKeySpend').textContent = cond.tripKm > 0
+    ? `${Math.round(spend)}% for ${Math.round(cond.tripKm)} km`
+    : 'no trip set';
+  $('pKeyReserve').textContent = `${Math.round(cond.reservePercent)}% reserve`;
+}
+
 /** Recompute and repaint the setup screen. Cheap enough to run on every input. */
 export function render() {
   syncOutputs();
@@ -103,35 +173,53 @@ export function render() {
   const cond = readConditions();
   const p = predict(cond);
 
+  // Arrival leads: before setting off, the question is "do I make it?", and
+  // that is a percentage. The countdown leads the LIVE screen instead, where
+  // the question has become "how long have I got?".
+  $('pArrival').textContent = p.arrivalSoc >= 0 ? Math.round(p.arrivalSoc) : 0;
   $('pTimeToEmpty').textContent = formatDuration(p.hoursToEmpty);
-  $('pEmptyClock').textContent = isFinite(p.hoursToEmpty)
-    ? `around ${clockTimeIn(p.hoursToEmpty)} if you set off now`
+  $('pEmptyClock').textContent = isFinite(p.hoursToEmpty) && cond.tripKm > 0
+    ? `Flat out at ${Math.round(cond.speedKmh)} km/h this charge runs out around ${clockTimeIn(p.hoursToEmpty)}.`
     : '';
-
-  $('pArrival').textContent = p.arrivalSoc >= 0 ? `${Math.round(p.arrivalSoc)}%` : '0%';
   $('pWhKm').textContent = Math.round(p.whPerKm);
   $('pRange').textContent = Math.round(p.kmToEmpty);
   $('pDuration').textContent = formatDuration(p.tripHours);
+  $('pTripNote').textContent = cond.tripKm > 0
+    ? `${Math.round(cond.tripKm)} km · ${state.tripMode === 'route' ? 'planned route' : 'entered by hand'}`
+    : '';
+
+  renderTrack(cond, p);
 
   const reserve = cond.reservePercent;
+  const result = $('setupResult');
+  let status = 'ok';
   if (cond.tripKm <= 0) {
+    status = 'tight';
     setVerdict($('pVerdict'), 'tight', 'Pick a destination, or switch to entering the distance by hand.');
   } else if (p.arrivalSoc < 0) {
+    status = 'bad';
     setVerdict($('pVerdict'), 'bad',
       `You run out <strong>${Math.round(p.shortfallKm)} km short</strong> of your destination.`);
   } else if (p.arrivalSoc < reserve) {
+    status = 'tight';
     setVerdict($('pVerdict'), 'tight',
       `You arrive with <strong>${Math.round(p.arrivalSoc)}%</strong> — below your ${reserve}% reserve.`);
   } else {
     setVerdict($('pVerdict'), 'ok',
       `You make it with <strong>${Math.round(p.arrivalSoc)}%</strong> to spare.`);
   }
+  // The status drives the colour of the hero and the track. It is never the
+  // only signal — the verdict below always says it in words, and carries an
+  // icon — because the amber and green here are a pair that protanopes and
+  // deuteranopes cannot reliably tell apart.
+  for (const s of ['ok', 'tight', 'bad']) result.classList.toggle(s, s === status);
 
   renderBreakdown(p.breakdown, {
     bar: 'pBar', aero: 'lgAero', roll: 'lgRoll', grade: 'lgGrade', aux: 'lgAux',
   });
 
   $('climateHint').textContent = climateDescription(cond);
+  paintClimateCosts(cond, 'climateSetup');
   $('pAdvice').innerHTML = cond.tripKm > 0 ? buildAdvice(cond, p) : '';
 }
 
@@ -147,7 +235,7 @@ export function render() {
  * driver's ACTUAL speed, which is where the point really lands.
  */
 export function climateDescription(cond) {
-  const w = climatePowerW(cond.climateLevel, cond.tempC, cond.car.heatPump);
+  const w = climatePowerW(cond.climateLevel, cond.tempC, cond.car.heatPump, cond.occupants);
   if (w === 0) return 'Climate off — only the ~300 W baseline electronics load.';
 
   const perKmNow = w / Math.max(3, cond.speedKmh);
@@ -163,7 +251,12 @@ export function climateDescription(cond) {
   if (cond.speedKmh > 40) {
     text += `, but ${(w / 30).toFixed(0)} Wh/km if you drop to 30 km/h in traffic`;
   }
-  return `${text}.`;
+  // Say what the figures on the buttons are a share OF. Without this they are
+  // four unlabelled percentages, which is its own kind of unreadable.
+  const basis = cond.tripKm > 0
+    ? ' Percentages above are each level\'s share of your battery over this trip.'
+    : ' Percentages above are each level\'s share of your battery per hour.';
+  return `${text}.${basis}`;
 }
 
 /**
